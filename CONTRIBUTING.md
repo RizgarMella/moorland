@@ -123,6 +123,10 @@ release together with the Erlang runtime into a single executable.
 - `mix release moorland_server` is a plain OTP release for running Moorland
   on a server. It honours `DATABASE_PATH`, `SECRET_KEY_BASE`, `PORT` and
   `PHX_HOST`; without them it configures itself like the desktop build.
+- Burrito downloads the target's Erlang runtime for the host's exact OTP
+  version, and its build server carries the main releases (27.3.4, 28.1
+  and so on), not every maintenance patch. The workflow and the Docker
+  image therefore pin OTP 27.3.4 precisely; change both together.
 - Cross builds take SQLite's native library precompiled for the target.
   Set `TARGET_OS`, `TARGET_ARCH` and `TARGET_ABI` (for example `windows`,
   `x86_64`, `msvc`) and run `mix deps.compile exqlite --force` before the

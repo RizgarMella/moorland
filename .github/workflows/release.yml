@@ -47,10 +47,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Exact versions on purpose: Burrito downloads the target's Erlang
+      # runtime for the host's precise OTP version, and its build server
+      # carries the main releases (27.3.4 here), not every maintenance patch.
       - uses: erlef/setup-beam@v1
         with:
           otp-version: "27.3.4"
           elixir-version: "1.18.4"
+          version-type: strict
 
       - uses: mlugg/setup-zig@v2
         with:
