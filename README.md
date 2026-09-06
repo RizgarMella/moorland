@@ -160,3 +160,7 @@ Moorland is written in Elixir with Phoenix LiveView, stores everything in
 SQLite, and keeps its editor logic in dependency free JavaScript. See
 [CONTRIBUTING.md](CONTRIBUTING.md) for setup, the test suite, and a map of
 the code.
+
+## License
+
+Moorland is released under the [MIT License](LICENSE).
