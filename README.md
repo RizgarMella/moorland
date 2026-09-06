@@ -1,164 +1,162 @@
 # Moorland
 
-A clean, collaborative screenwriting app in the spirit of Highland — built to
-**democratise scriptwriting**: free software, an open format, your files on
-your own disk or your own cloud, and collaboration without a central server.
+**Collaborative screenwriting that runs on your own machine, syncs directly
+with the people you write with, and keeps every script as plain text you
+own.**
 
-One piece of software, distributed. Every install is identical; solo writer,
-peer circle, or (future) studio are just configuration.
+Moorland is a screenwriting app for writers and writing rooms. Write in
+Fountain with a properly typeset page beside you. Share a script with
+collaborators by role. Link installations to each other and your scripts,
+comments, notes and history flow between machines with no server in the
+middle. It is free software built on an open format.
 
-## The stack
+## Why Moorland
 
-- **Elixir / Phoenix LiveView** — server-rendered UI with real-time updates
-- **SQLite** (via `ecto_sqlite3`) — a single local database file, no DB server
-- **Tailwind v4 + daisyUI** — styling; **esbuild** — JS bundling
-- Client-side JS (no framework): the Fountain parser, editor smarts, and all
-  offline behavior live in `assets/js/`
+- **Your files are yours.** Every script is mirrored as a plain `.fountain`
+  file in a folder you choose. Readable in any text editor, forever, with or
+  without Moorland.
+- **No central server.** Every installation is complete on its own. Link two
+  and they talk to each other directly, end to end encrypted.
+- **One install, any role.** Write alone, form a circle with the people you
+  trust, or run a studio for a whole team. It is the same software with a
+  different configuration.
+- **Open formats in and out.** Fountain and Final Draft in. Fountain, Final
+  Draft, PDF, HTML and Markdown out.
 
-## Quick start
-
-Prereqs: Erlang/OTP 29 + Elixir 1.20 (on this machine they're installed at
-`C:\Program Files\Erlang OTP` and `C:\Program Files\Elixir`, already on PATH).
-
-```sh
-mix deps.get
-mix ecto.migrate
-mix phx.server        # http://localhost:4000
-mix test              # full suite (~180 tests)
-```
-
-Register an account at `/users/register` (the confirmation email appears in
-the dev mailbox at `/dev/mailbox`). If you ever see *"could not compile
-application ... restart your server"* it means a file in `config/` changed —
-stop the server and start it again; code changes hot-reload, config doesn't.
-
-## What it does
+## Features
 
 ### Writing
-- **Fountain editor with live preview** — plain text on the left, a properly
-  typeset screenplay page on the right (Courier, industry margins, scene
-  numbers, ~55-lines-per-page numbering, title page laid out to standard).
-- **Stream-of-consciousness smart formatting** — press Enter and loose text
-  becomes structure: `int coffee shop daisy Hey guys!` → a scene heading, a
-  `DAISY` cue, and dialogue. Works line-by-line too, splits `(whispering)`
-  and `(beat)` onto parenthetical lines, separates action from dialogue, and
-  never touches title-page lines. The **Tidy** button (bottom-right of the
-  editor) retro-formats a whole messy document. Ctrl+Z undoes everything.
-- **Autocomplete** — characters, locations, scene prefixes, times of day,
-  `(V.O.)`-style extensions, and title-page keys, harvested live from the
-  script itself. Tab/Enter accepts, arrows navigate, Esc dismisses.
-- **Script helper chips** (subtle, in the preview, editors only): add a
-  missing DAY/NIGHT to a heading, fix a probable character-name typo
-  ("DASIY → NORA?"), insert a standard title page.
-- **Scene navigator** — list icon in the toolbar; click to jump, drag to
-  reorder whole scenes.
-- **Distraction-free chrome** — the toolbar auto-hides while typing (pin it
-  to stop that, ⌃ hides it on demand, the top-center chevron brings it
-  back); the divider chevrons `‹ ›` collapse either pane; a fullscreen
-  button (Esc leaves). Layout is remembered per browser.
-- **Light/dark themes**, offline-first editing (localStorage buffer that
-  syncs — and merges — when the connection returns), Ctrl+S to force-save.
+
+- **A real page while you type.** Plain text on the left, an industry
+  standard screenplay page on the right: Courier, correct margins, scene
+  numbers, page breaks and a title page laid out to standard.
+- **Smart formatting.** Type loosely and press Enter. `int coffee shop daisy
+  Hey guys!` becomes a scene heading, a character cue and a line of dialogue.
+  Parentheticals split onto their own lines, action separates from dialogue,
+  and one click tidies a whole messy document. Undo reverts everything.
+- **Autocomplete** for characters, locations, times of day, extensions like
+  `(V.O.)` and title page keys, learned from the script itself.
+- **Helper chips** in the preview offer fixes as you go: a missing DAY or
+  NIGHT, a probable character name typo, a standard title page.
+- **Scene navigator.** Click to jump, drag to reorder whole scenes. Sections
+  and inline notes are listed too.
+- **Focus.** The toolbar hides while you type. Collapse either pane, go
+  fullscreen, switch on typewriter scrolling, and pick your paper colour and
+  font. Light and dark themes. Works on a phone or tablet.
+- **Goals and sprints.** Set word or page goals and watch the progress bar.
+  Run a timed writing sprint with a live word count.
+- **Lookup.** Definitions, synonyms and rhymes without leaving the editor.
+- **Bin and Shelf.** Text you cut goes to the script's Bin. Text you want to
+  keep across scripts goes to your private Shelf. Nothing is ever lost.
+- **Offline first.** Keep writing without a connection. Your work merges
+  back when the connection returns.
 
 ### Collaboration
-- **Multi-user scripts** — share by email with a role: Editor, Commenter, or
-  Viewer. Presence avatars show who's in the script; edits appear live.
-- **Merge-safe co-editing** — every save carries the version it was built on;
-  concurrent saves are three-way merged line-by-line on the server (both
-  sides' work survives; only a same-line conflict falls to the newer write).
-- **Comments & notes** — threaded, resolvable comments anchored to lines;
-  highlight text in the preview to comment on exactly that bit; color-coded
-  pinnable note cards.
-- **Version history** — named snapshots, auto-snapshots every 10 minutes,
-  line diffs against the current draft, non-destructive restore.
-- **Reports** — page count, estimated runtime, speaking parts with dialogue
-  share, scene mix (INT/EXT, DAY/NIGHT), locations.
 
-### Peer-to-peer (phase one)
-- Every install has an **Ed25519 identity** and a shareable peer code
-  (`moor:<key>@host:port`) — see the **Peers** page.
-- Both sides add each other's codes; then scripts shared from the editor's
-  Share panel mirror onto the peer's machine and sync every ~10 s, merging
-  through the same engine as local co-editing. All traffic is end-to-end
-  encrypted and signed: each request is a sealed envelope (X25519 +
-  ChaCha20-Poly1305 over the Ed25519 identities), unknown keys are rejected,
-  and nothing about a script — not even its id — crosses the wire in the
-  clear. Works on a LAN, VPN (e.g. Tailscale), a forwarded port, or the open
-  internet. See `ROADMAP.md` for the path to holepunching + studios.
-- **Comments, notes and history travel with the script.** Threads, replies
-  and resolutions, sticky notes, and named snapshots sync both ways,
-  deletions included, each record keyed by its own id. Authors on other
-  installs show by handle with a "via peer" mark. The origin's history is
-  the shared history; your own named snapshots join it.
-- Try it locally: run a second copy with `PORT=4001 mix phx.server`.
+- **Share by email** with a role: Editor, Commenter or Viewer. See who is in
+  the script with you and watch edits appear live.
+- **Merge safe editing.** When two people save at once, both sets of changes
+  survive. Only a change to the very same line falls to the newer write.
+- **Comments where they belong.** Highlight text in the preview to comment on
+  exactly that passage. Threads, replies and resolution. Colour coded,
+  pinnable note cards for everything else.
+- **Mentions.** Write `@name` in a comment and they get a notification and an
+  email.
+- **Version history.** Named snapshots, automatic snapshots as you work, line
+  by line diffs against the current draft, and restore that never destroys
+  anything.
+- **Search** across every script, comment and note you can access.
+- **Contacts.** A rolodex for cast and crew, ready for production paperwork.
 
-### Your files are yours
-- Everything lives in one **data folder** (default: this project directory) —
-  the SQLite database plus `scripts/`, a **plain-text `.fountain` mirror of
-  every script**, rewritten on every save. Readable in any text editor,
-  forever, without Moorland.
-- The Peers page → **Storage** card moves the data folder anywhere: an
-  external drive or a Google Drive / iCloud / Dropbox folder for automatic
-  cloud backup (one machine at a time against a synced folder). Env override:
-  `MOORLAND_DATA_DIR`.
-- **Export**: PDF via print (clean, or DRAFT/FINAL watermark), `.fountain`,
-  Final Draft `.fdx`. **Import**: `.fountain`, `.txt`, `.fdx`.
+### Reports
 
-### Updates
-- Set `config :moorland, :update_repo, "owner/repo"` (or the
-  `MOORLAND_UPDATE_REPO` env var) to your GitHub repo and Moorland checks its
-  releases every 6 hours. A quiet banner on the Scripts page announces a
-  newer version, with a version picker (latest highlighted, installed
-  marked, pre-releases labeled) linking to each release. "Check for updates"
-  lives on the Peers page. Until packaged builds land, updating = pull the
-  release and restart.
+Page count, estimated running time, speaking parts with each character's
+share of dialogue, scene mix by interior and exterior and by day and night,
+locations, and a dialogue balance line from optional gender tags.
 
-## Code map
+### Working with someone on another machine
 
-```
-lib/moorland/
-  scripts.ex               Core context: scripts, roles, comments, notes,
-                           versions, peer shares, mirrors. All authz here.
-  scripts/merge.ex         Line-based three-way merge (the collaboration core)
-  scripts/content_cache.ex Recent-version cache + per-script save lock
-  scripts/stats.ex         Report computation (Elixir port of the classifier)
-  scripts/activity.ex      Comments, notes and history sync between installs
-  storage.ex               Data folder, relocation, .fountain mirroring
-  updates.ex               GitHub release checker for the update banner
-  peers.ex                 P2P identity, peer codes, trust
-  peers/crypto.ex          Ed25519 keys, signing, peer-code format
-  peers/envelope.ex        The encrypted wire: sealed X25519 + ChaCha20-
-                           Poly1305 envelopes, signed hello (pure functions)
-  peers/transport.ex       Per-run key-exchange pair, peer keys, replay guard
-  peers/client.ex          Encrypted outbound HTTP (:httpc, no deps)
-  peers/sync.ex            Background reconciler (plan/2 is the pure logic)
+Moorland installations link to each other directly.
 
-lib/moorland_web/
-  live/script_live/index.ex    Dashboard (+ import, update banner)
-  live/script_live/editor.ex   The editor: toolbar, panels, all events
-  live/peer_live/index.ex      Peers, storage, identity, update check
-  controllers/peer_api_controller.ex  Encrypted peer wire (hello + envelope)
+- Every installation has an identity and a short **peer code**. Swap codes
+  with a collaborator, or find each other automatically on the same network,
+  and you are linked.
+- **Share a script** from its Share panel to a peer as Editor or Viewer. It
+  appears on their Scripts page and stays in sync from then on. Edits from
+  both sides merge, the same way they do between collaborators on one
+  install.
+- **Comments, notes and history travel too.** Threads, resolutions, notes and
+  named snapshots sync in both directions. Authors on other installations are
+  shown by name with a small "via peer" mark.
+- **Private by construction.** Everything between installations is end to
+  end encrypted and signed. Only peers you have added are served, and nothing
+  about a script crosses the wire in the clear.
+- Works on a local network, over a VPN such as Tailscale, through a
+  forwarded port, or across the open internet.
 
-assets/js/
-  fountain.js        Fountain parser + HTML renderer (line-tracked, paginated)
-  smart_format.js    On-Enter smart formatting + tidyDocument
-  editor_hook.js     The big editor hook: autosave/offline/merge sync,
-                     autocomplete, preview sync, scene nav, export/print
-  scene_tools.js     Scene list + drag-reorder (pure)
-  fdx.js             Final Draft import/export
-  ui_prefs.js        Distraction-free chrome + fullscreen (body classes)
-  importer_hook.js   Dashboard file import
-  update_banner_hook.js  Banner dismissal + version picker
+### Import and export
+
+- **Import** Fountain, plain text and Final Draft (`.fdx`) files.
+- **Export** to PDF (clean, or watermarked DRAFT or FINAL), sides for chosen
+  scenes, Fountain, Final Draft, HTML and Markdown.
+
+### Your data, your folder
+
+Everything Moorland knows lives in one data folder: a single database file
+plus a `scripts` folder holding the plain text mirror of every script,
+rewritten on every save. Move the folder to an external drive or a cloud
+synced folder from the Storage card on the Peers page, and you have backup
+without giving anyone your scripts.
+
+## Getting started
+
+Moorland runs on your own computer. You need Elixir 1.17 or newer with a
+matching Erlang/OTP release ([install guide](https://elixir-lang.org/install.html)).
+
+```sh
+git clone https://github.com/RizgarMella/moorland.git
+cd moorland
+mix setup
+mix phx.server
 ```
 
-Conventions worth knowing: all context functions take a `%Scope{}` first and
-enforce roles; real-time flows through `Phoenix.PubSub` topic `script:<id>`;
-the editor DOM under `#editor-root` is `phx-update="ignore"` (the hook owns
-it); pure logic lives in plain modules/functions so `mix test` covers it, and
-the JS logic modules were built to run under plain Node for testing.
+Open <http://localhost:4000> and create an account. Confirmation emails are
+delivered to the built in mailbox at `/dev/mailbox`, so no mail server is
+needed.
+
+### Linking with a collaborator
+
+1. Open the **Peers** page and copy your peer code. Send it to your
+   collaborator, and add theirs. On the same network, they appear under
+   **Nearby on this network** with a one click Add.
+2. Open a script, choose **Share**, and pick the peer and their role.
+3. The script appears on their Scripts page within seconds and stays in sync.
+
+Your installation needs an address the other side can reach: the same
+network, a VPN, or a forwarded port. Connecting through home routers without
+any setup is on the roadmap.
+
+## Staying up to date
+
+Point Moorland at a GitHub repository with `config :moorland, :update_repo,
+"owner/repo"` (or the `MOORLAND_UPDATE_REPO` environment variable) and it
+checks for releases every six hours. A quiet banner on the Scripts page
+announces a newer version with a version picker, and the Peers page has a
+manual check. Updating today means pulling the release and restarting; one
+file installers with in place updates are on the roadmap.
 
 ## Roadmap
 
-See `ROADMAP.md` — phase one's honest limitations, the path to the fully
-distributed "last phase" (studio mode, encryption, holepunching, single-exe
-packaging), Highland Pro parity gaps, and the editor backlog. AI features are
-deliberately excluded (separate plan).
+Studio mode, so any installation can also back up and introduce a circle of
+writers. Connecting across the internet with nothing more than two peer
+codes. One file installers for every platform. Then pre-production: script
+breakdowns, stripboards and shooting schedules, shot lists, day out of days
+and call sheets, distributed through the same peer circle. Details and
+current status are in [ROADMAP.md](ROADMAP.md).
+
+## For developers
+
+Moorland is written in Elixir with Phoenix LiveView, stores everything in
+SQLite, and keeps its editor logic in dependency free JavaScript. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for setup, the test suite, and a map of
+the code.
