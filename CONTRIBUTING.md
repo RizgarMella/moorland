@@ -109,6 +109,52 @@ assets/js/
   merges and decides; mirrors push and pull. New wire operations go through
   the sealed envelope in `PeerApiController` and `Peers.Client`.
 
+## Packaging
+
+Users get Moorland as one file per platform, built with
+[Burrito](https://github.com/burrito-elixir/burrito), which wraps a Mix
+release together with the Erlang runtime into a single executable.
+
+- `mix release moorland` builds the packaged targets defined in `mix.exs`
+  (`windows`, `macos`, `macos_arm`, `linux`) into `burrito_out/`. Set
+  `BURRITO_TARGET` to build one. It needs exactly the Zig version Burrito
+  pins (0.16.0 for Burrito 1.6), `xz`, and `7z` for the Windows target, and
+  cannot run on a Windows host; use the Docker recipe below instead.
+- `mix release moorland_server` is a plain OTP release for running Moorland
+  on a server. It honours `DATABASE_PATH`, `SECRET_KEY_BASE`, `PORT` and
+  `PHX_HOST`; without them it configures itself like the desktop build.
+- Cross builds take SQLite's native library precompiled for the target.
+  Set `TARGET_OS`, `TARGET_ARCH` and `TARGET_ABI` (for example `windows`,
+  `x86_64`, `msvc`) and run `mix deps.compile exqlite --force` before the
+  release; the workflow in `.github/workflows/release.yml` and
+  `release/Dockerfile` show the values for each target.
+- On any machine with Docker, including Windows:
+
+  ```sh
+  docker build -t moorland-release release/
+  docker run --rm -v "$PWD:/app" -v moorland-build:/build \
+    -e BURRITO_TARGET=windows -e TARGET_OS=windows -e TARGET_ARCH=x86_64 -e TARGET_ABI=msvc \
+    moorland-release
+  ```
+
+- The packaged build has its own VM flags in `rel/desktop/vm.args.eex`.
+  Two matter: `-noinput`, so the app survives a closed standard input, and
+  `-extra --no-halt`, because Burrito starts the VM through the Elixir CLI
+  without `--no-halt` and the VM would otherwise exit the moment boot
+  finishes. Keep `-extra` last in that file.
+- Burrito unpacks a binary once per version into a per-user cache
+  (`%APPDATA%\.burrito` on Windows, `~/.local/share/.burrito` elsewhere)
+  and reuses it. Bump the version in `mix.exs` for every release; when
+  iterating on a build with the same version, delete that cache folder or
+  run `moorland_<target> maintenance uninstall` first.
+- Pushing a tag such as `v0.2.0` runs the release workflow: all four builds
+  are attached to a GitHub release, which the in-app update banner reads.
+
+Production configuration lives in `config/runtime.exs`: the data folder
+(`MOORLAND_DATA_DIR`, else the pointer file, else the platform's application
+data folder), a secret generated once and kept beside the database, a server
+that is always on, and the browser launch (`MOORLAND_NO_BROWSER=1` to skip).
+
 ## Tests
 
 `mix test` runs everything, including the peer wire against a real HTTP

@@ -154,6 +154,14 @@ it wrote; the origin's owner can delete anything and the next pull follows.
   builds one file per OS; it claims `moorland-<shortid>.local` on launch;
   the existing update banner gains true install-on-restart (signature-checked
   downloads, rollback via the version picker).
+  *In progress (Sep 6 2026):* shipped the self-configuring production build
+  (data folder per platform, generated secret, server always on, browser
+  launch, migrations on boot, mailbox loopback-only), Burrito targets for
+  Windows, macOS (Intel and Apple silicon) and Linux with precompiled SQLite
+  per target, a Docker recipe for building on any host, and a release
+  workflow that attaches all four files to a tagged GitHub release. Left:
+  the `.local` name claim (mDNS), install-on-restart with signature checks,
+  and code signing for Windows and macOS.
 - **NAT holepunching** [peer, phase 3 core; fixes #1–2] — STUN/ICE-style
   holepunching (libp2p-inspired; `ex_webrtc` a candidate) with studios as
   rendezvous and relay fallback, so any two writers on the internet can link

@@ -110,8 +110,26 @@ without giving anyone your scripts.
 
 ## Getting started
 
-Moorland runs on your own computer. You need Elixir 1.17 or newer with a
-matching Erlang/OTP release ([install guide](https://elixir-lang.org/install.html)).
+Moorland runs on your own computer, as one file.
+
+### Download
+
+Every [release](https://github.com/RizgarMella/moorland/releases) carries a
+single file per platform: `moorland_windows.exe`, `moorland_macos` (Intel),
+`moorland_macos_arm` (Apple silicon) and `moorland_linux`. Download it, run
+it, and Moorland opens in your browser at <http://localhost:4000>. Create an
+account; the confirmation email is delivered to the built in mailbox at
+`/dev/mailbox`, so no mail server is needed.
+
+Your data lives in `%LOCALAPPDATA%\Moorland` on Windows, `~/Library/Application
+Support/Moorland` on macOS, and `~/.local/share/moorland` on Linux, and can
+be moved from the Peers page. The builds are not code signed yet: Windows
+SmartScreen and macOS Gatekeeper will ask you to confirm the first launch.
+
+### Run from source
+
+You need Elixir 1.17 or newer with a matching Erlang/OTP release
+([install guide](https://elixir-lang.org/install.html)).
 
 ```sh
 git clone https://github.com/RizgarMella/moorland.git
@@ -120,9 +138,7 @@ mix setup
 mix phx.server
 ```
 
-Open <http://localhost:4000> and create an account. Confirmation emails are
-delivered to the built in mailbox at `/dev/mailbox`, so no mail server is
-needed.
+Then open <http://localhost:4000>.
 
 ### Linking with a collaborator
 
@@ -138,12 +154,12 @@ any setup is on the roadmap.
 
 ## Staying up to date
 
-Point Moorland at a GitHub repository with `config :moorland, :update_repo,
-"owner/repo"` (or the `MOORLAND_UPDATE_REPO` environment variable) and it
-checks for releases every six hours. A quiet banner on the Scripts page
-announces a newer version with a version picker, and the Peers page has a
-manual check. Updating today means pulling the release and restarting; one
-file installers with in place updates are on the roadmap.
+Packaged builds check this project's releases every six hours. A quiet
+banner on the Scripts page announces a newer version with a version picker,
+and the Peers page has a manual check. Updating today means downloading the
+new file and starting it in place of the old one; your data folder is
+untouched. In place updates are on the roadmap. Forks can point the check at
+their own repository with the `MOORLAND_UPDATE_REPO` environment variable.
 
 ## Roadmap
 

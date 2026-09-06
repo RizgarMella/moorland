@@ -11,7 +11,33 @@ defmodule Moorland.MixProject do
       aliases: aliases(),
       deps: deps(),
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
-      listeners: [Phoenix.CodeReloader]
+      listeners: [Phoenix.CodeReloader],
+      releases: releases()
+    ]
+  end
+
+  # `mix release moorland` wraps the whole app into one file per platform
+  # (see burrito_out/); `mix release moorland_server` is a plain OTP release
+  # for people who run Moorland on a server of their own.
+  defp releases do
+    [
+      moorland: [
+        steps: [:assemble, &Burrito.wrap/1],
+        # Desktop-only VM flags (see rel/desktop/vm.args.eex).
+        rel_templates_path: "rel/desktop",
+        burrito: [
+          # Cross builds take SQLite's precompiled native library for the
+          # target (selected with TARGET_OS/ARCH/ABI while compiling deps)
+          # rather than letting Burrito recompile it with Zig.
+          targets: [
+            windows: [os: :windows, cpu: :x86_64, skip_nifs: true],
+            macos: [os: :darwin, cpu: :x86_64, skip_nifs: true],
+            macos_arm: [os: :darwin, cpu: :aarch64, skip_nifs: true],
+            linux: [os: :linux, cpu: :x86_64, skip_nifs: true]
+          ]
+        ]
+      ],
+      moorland_server: [steps: [:assemble]]
     ]
   end
 
@@ -73,7 +99,8 @@ defmodule Moorland.MixProject do
       {:gettext, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
-      {:bandit, "~> 1.5"}
+      {:bandit, "~> 1.5"},
+      {:burrito, "~> 1.6"}
     ]
   end
 
@@ -92,6 +119,7 @@ defmodule Moorland.MixProject do
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["compile", "tailwind moorland", "esbuild moorland"],
       "assets.deploy": [
+        "compile",
         "tailwind moorland --minify",
         "esbuild moorland --minify",
         "phx.digest"

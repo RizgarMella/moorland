@@ -1,0 +1,96 @@
+name: Release builds
+
+# One self-contained file per platform. Burrito builds every target from a
+# Linux host: it downloads the Erlang runtime for the target, and SQLite's
+# native library comes precompiled for the target (chosen through the
+# TARGET_* variables while dependencies compile). Pushing a tag such as
+# v0.2.0 builds all four and attaches them to a GitHub release, which the
+# in-app update banner then reads. See release/Dockerfile for the same
+# build on any machine.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux
+            artifact: moorland_linux
+            nif_os: linux
+            nif_arch: x86_64
+            nif_abi: gnu
+          - target: windows
+            artifact: moorland_windows.exe
+            nif_os: windows
+            nif_arch: x86_64
+            nif_abi: msvc
+          - target: macos
+            artifact: moorland_macos
+            nif_os: apple
+            nif_arch: x86_64
+            nif_abi: darwin
+          - target: macos_arm
+            artifact: moorland_macos_arm
+            nif_os: apple
+            nif_arch: aarch64
+            nif_abi: darwin
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "27.3.4"
+          elixir-version: "1.18.4"
+
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+
+      - name: Install xz and 7z
+        run: sudo apt-get update && sudo apt-get install -y xz-utils p7zip-full
+
+      - name: Build the single-file release
+        env:
+          MIX_ENV: prod
+          BURRITO_TARGET: ${{ matrix.target }}
+          TARGET_OS: ${{ matrix.nif_os }}
+          TARGET_ARCH: ${{ matrix.nif_arch }}
+          TARGET_ABI: ${{ matrix.nif_abi }}
+        run: |
+          mix deps.get --only prod
+          mix deps.compile
+          mix deps.compile exqlite --force
+          mix assets.deploy
+          mix release moorland --overwrite
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: burrito_out/${{ matrix.artifact }}
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

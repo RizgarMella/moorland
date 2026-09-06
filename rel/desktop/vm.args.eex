@@ -1,0 +1,12 @@
+## VM flags for the packaged desktop build (mix release moorland).
+## -mode/-name/-sname/-setcookie are configured via env vars, do not set them here.
+
+## Never read standard input: the packaged app must keep running when it is
+## started without a console, or when the console's input is closed.
+-noinput
+
+## Burrito starts the VM through the Elixir CLI and forwards only the
+## binary's own arguments, so nothing says --no-halt and the CLI would halt
+## the VM the moment boot finishes. Passing it here keeps the server alive.
+## -extra must stay last: everything after it is a plain argument.
+-extra --no-halt

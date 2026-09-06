@@ -43,3 +43,12 @@ npm-debug.log
 # Local script data
 /scripts/
 moorland*.db*
+
+# Single-file release builds (mix release moorland)
+/burrito_out/
+
+# Digested copies written by mix phx.digest (mix phx.digest.clean --all removes them)
+/priv/static/**/*.gz
+/priv/static/favicon-*.ico
+/priv/static/robots-*.txt
+/priv/static/images/*-????????????????????????????????.svg
