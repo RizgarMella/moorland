@@ -44,7 +44,7 @@ defmodule Moorland.TierTwoTest do
     test "finds scripts, comments and notes the user can access", %{
       owner: owner,
       other: other,
-      other_user: ou
+      other_user: _ou
     } do
       {:ok, s1} = Scripts.create_script(owner, %{title: "Harbor", content: "The tide rises."})
       {:ok, _s2} = Scripts.create_script(other, %{title: "Private", content: "tide secrets"})

@@ -54,13 +54,18 @@ defmodule Moorland.ScriptsTest do
       s = script(owner)
       {:ok, _} = Scripts.add_collaborator(owner, s, ou.email, "editor")
       {s, :editor} = Scripts.get_script!(other, s.id)
-      assert {:error, :not_allowed} = Scripts.add_collaborator(other, s, "x@example.com", "viewer")
+
+      assert {:error, :not_allowed} =
+               Scripts.add_collaborator(other, s, "x@example.com", "viewer")
+
       assert {:error, :not_allowed} = Scripts.delete_script(other, s)
     end
 
     test "adding an unknown email fails cleanly", %{owner: owner} do
       s = script(owner)
-      assert {:error, :user_not_found} = Scripts.add_collaborator(owner, s, "nope@x.com", "editor")
+
+      assert {:error, :user_not_found} =
+               Scripts.add_collaborator(owner, s, "nope@x.com", "editor")
     end
 
     test "shared scripts appear in the collaborator's list", %{
@@ -77,7 +82,11 @@ defmodule Moorland.ScriptsTest do
   end
 
   describe "merge-safe concurrent saves" do
-    test "a stale save merges instead of clobbering", %{owner: owner, other: other, other_user: ou} do
+    test "a stale save merges instead of clobbering", %{
+      owner: owner,
+      other: other,
+      other_user: ou
+    } do
       s = script(owner)
       {:ok, _} = Scripts.add_collaborator(owner, s, ou.email, "editor")
       {s_other, :editor} = Scripts.get_script!(other, s.id)
@@ -139,7 +148,11 @@ defmodule Moorland.ScriptsTest do
       assert s.goal_words == nil
     end
 
-    test "character genders upsert and are role-gated", %{owner: owner, other: other, other_user: ou} do
+    test "character genders upsert and are role-gated", %{
+      owner: owner,
+      other: other,
+      other_user: ou
+    } do
       s = script(owner)
       :ok = Scripts.set_character_gender(owner, s, "NORA", "female")
       :ok = Scripts.set_character_gender(owner, s, "NORA", "nonbinary")
@@ -185,7 +198,11 @@ defmodule Moorland.ScriptsTest do
       {s, _} = Scripts.get_script!(other, s.id)
 
       {:ok, top} =
-        Scripts.create_comment(other, s, %{body: "Too slow?", line_no: 3, anchor_text: "He waits."})
+        Scripts.create_comment(other, s, %{
+          body: "Too slow?",
+          line_no: 3,
+          anchor_text: "He waits."
+        })
 
       {:ok, _reply} = Scripts.create_comment(owner, s, %{body: "Agreed", parent_id: top.id})
 

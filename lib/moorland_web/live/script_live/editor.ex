@@ -160,13 +160,6 @@ defmodule MoorlandWeb.ScriptLive.Editor do
     {:noreply, assign(socket, :char_meta, Scripts.list_character_meta(script))}
   end
 
-  defp parse_goal(value) do
-    case Integer.parse(to_string(value || "")) do
-      {n, _} when n > 0 -> n
-      _ -> nil
-    end
-  end
-
   ## Bin & Shelf
 
   def handle_event("bin_cut", _params, socket) do
@@ -265,40 +258,6 @@ defmodule MoorlandWeb.ScriptLive.Editor do
      socket
      |> assign(:title_form, nil)
      |> push_event("set_title_page", %{block: block})}
-  end
-
-  defp build_title_block(params) do
-    field = fn key -> params[key] |> to_string() |> String.trim() end
-
-    single = fn key, label ->
-      case field.(key) do
-        "" -> []
-        value -> ["#{label}: #{value}"]
-      end
-    end
-
-    contact =
-      case field.("contact") do
-        "" ->
-          []
-
-        value ->
-          ["Contact:" | value |> String.split(~r/\r?\n/, trim: true) |> Enum.map(&("    " <> String.trim(&1)))]
-      end
-
-    lines =
-      single.("title", "Title") ++
-        single.("credit", "Credit") ++
-        single.("author", "Author") ++
-        single.("source", "Source") ++
-        single.("draft_date", "Draft date") ++
-        contact ++
-        single.("copyright", "Copyright")
-
-    case lines do
-      [] -> ""
-      _ -> Enum.join(lines, "\n") <> "\n\n"
-    end
   end
 
   def handle_event("toggle_nav", _params, socket) do
@@ -464,6 +423,54 @@ defmodule MoorlandWeb.ScriptLive.Editor do
     %{current_scope: scope, script: script} = socket.assigns
     Scripts.set_peer_share(scope, script, String.to_integer(peer_id), role)
     {:noreply, load_panel_data(socket)}
+  end
+
+  ## Event helpers
+
+  defp parse_goal(value) do
+    case Integer.parse(to_string(value || "")) do
+      {n, _} when n > 0 -> n
+      _ -> nil
+    end
+  end
+
+  defp build_title_block(params) do
+    field = fn key -> params[key] |> to_string() |> String.trim() end
+
+    single = fn key, label ->
+      case field.(key) do
+        "" -> []
+        value -> ["#{label}: #{value}"]
+      end
+    end
+
+    contact =
+      case field.("contact") do
+        "" ->
+          []
+
+        value ->
+          [
+            "Contact:"
+            | value
+              |> String.split(~r/\r?\n/, trim: true)
+              |> Enum.map(&("    " <> String.trim(&1)))
+          ]
+      end
+
+    lines =
+      single.("title", "Title") ++
+        single.("credit", "Credit") ++
+        single.("author", "Author") ++
+        single.("source", "Source") ++
+        single.("draft_date", "Draft date") ++
+        contact ++
+        single.("copyright", "Copyright")
+
+    case lines do
+      [] -> ""
+      _ -> Enum.join(lines, "\n") <> "\n\n"
+    end
   end
 
   ## PubSub & timers
@@ -634,8 +641,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
           data-saved-text="Saved"
           data-saving-text="Saving…"
           data-offline-text="Offline — changes kept locally"
-        >
-        </span>
+        ></span>
 
         <div class="ml-auto flex items-center gap-3">
           <div class="dropdown dropdown-end">
@@ -663,11 +669,15 @@ defmodule MoorlandWeb.ScriptLive.Editor do
                   PDF — “FINAL” watermark
                 </button>
               </li>
-              <li><button phx-click="export" phx-value-format="fountain">Fountain (.fountain)</button></li>
+              <li>
+                <button phx-click="export" phx-value-format="fountain">Fountain (.fountain)</button>
+              </li>
               <li><button phx-click="export" phx-value-format="fdx">Final Draft (.fdx)</button></li>
               <li><button phx-click="export" phx-value-format="html">Web page (.html)</button></li>
               <li><button phx-click="export" phx-value-format="markdown">Markdown (.md)</button></li>
-              <li><button phx-click="export" phx-value-format="sides">Script sides (PDF)…</button></li>
+              <li>
+                <button phx-click="export" phx-value-format="sides">Script sides (PDF)…</button>
+              </li>
             </ul>
           </div>
 
@@ -689,7 +699,9 @@ defmodule MoorlandWeb.ScriptLive.Editor do
               </div>
               <div class="mt-1 flex gap-1">
                 <button
-                  :for={{name, label} <- [{"default", "Classic"}, {"sepia", "Sepia"}, {"slate", "Slate"}]}
+                  :for={
+                    {name, label} <- [{"default", "Classic"}, {"sepia", "Sepia"}, {"slate", "Slate"}]
+                  }
                   type="button"
                   data-paper={name}
                   onclick={"moorlandUI.setPaper('#{name}')"}
@@ -718,7 +730,9 @@ defmodule MoorlandWeb.ScriptLive.Editor do
               </div>
               <div class="mt-1 flex gap-1">
                 <button
-                  :for={{name, label} <- [{"default", "Courier"}, {"mono", "Modern"}, {"serif", "Book"}]}
+                  :for={
+                    {name, label} <- [{"default", "Courier"}, {"mono", "Modern"}, {"serif", "Book"}]
+                  }
                   type="button"
                   data-font={name}
                   onclick={"moorlandUI.setFont('#{name}')"}
@@ -829,7 +843,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
               spellcheck="false"
               autocomplete="off"
               readonly={!Scripts.can_edit?(@role)}
-              placeholder={"INT. COFFEE SHOP - DAY\n\nStart writing. Scene headings, character names and dialogue are formatted automatically in the preview."}
+              placeholder="INT. COFFEE SHOP - DAY\n\nStart writing. Scene headings, character names and dialogue are formatted automatically in the preview."
               class="editor-textarea"
             >{@script.content}</textarea>
             <div id="autocomplete-menu" class="autocomplete-menu" hidden></div>
@@ -860,7 +874,10 @@ defmodule MoorlandWeb.ScriptLive.Editor do
               <.icon name="hero-chevron-right" class="size-3.5" />
             </button>
           </div>
-          <div id="preview-wrap" class="preview-pane relative hidden min-w-0 flex-1 overflow-y-auto md:block">
+          <div
+            id="preview-wrap"
+            class="preview-pane relative hidden min-w-0 flex-1 overflow-y-auto md:block"
+          >
             <div id="screenplay-preview" class="screenplay"></div>
             <div id="comment-bubble" class="comment-bubble" hidden>
               <button type="button" data-comment title="Comment on this selection">
@@ -970,7 +987,11 @@ defmodule MoorlandWeb.ScriptLive.Editor do
           <label :if={@anchor} class="flex min-w-0 items-center gap-1.5 text-xs text-base-content/60">
             <input type="checkbox" name="anchored" value="true" checked class="checkbox checkbox-xs" />
             <span class="truncate">
-              Line {@anchor.line + 1}<span :if={@anchor.text != ""}>: “{String.slice(@anchor.text, 0, 24)}”</span>
+              Line {@anchor.line + 1}<span :if={@anchor.text != ""}>: “{String.slice(
+                @anchor.text,
+                0,
+                24
+              )}”</span>
             </span>
           </label>
           <span :if={!@anchor} class="text-xs text-base-content/40">
@@ -1111,8 +1132,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
               <span class={[
                 "block size-4 rounded-full border peer-checked:ring-2 peer-checked:ring-neutral peer-checked:ring-offset-1",
                 note_color_class(color)
-              ]}>
-              </span>
+              ]}></span>
             </label>
           </div>
           <button type="submit" class="btn btn-neutral btn-xs">Add note</button>
@@ -1297,7 +1317,11 @@ defmodule MoorlandWeb.ScriptLive.Editor do
         <h2 class="text-sm font-semibold">Lookup</h2>
       </div>
 
-      <form id="lookup-form" phx-submit="lookup" class="flex gap-1.5 border-b border-base-300 px-4 py-3">
+      <form
+        id="lookup-form"
+        phx-submit="lookup"
+        class="flex gap-1.5 border-b border-base-300 px-4 py-3"
+      >
         <input
           type="text"
           name="q"
@@ -1539,7 +1563,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
           </div>
         </div>
 
-        <div :if={Scripts.can_edit?(@role) or @script.goal_words || @script.goal_pages} class="mt-5">
+        <div :if={(Scripts.can_edit?(@role) or @script.goal_words) || @script.goal_pages} class="mt-5">
           <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/50">
             Goals
           </h3>
@@ -1688,7 +1712,10 @@ defmodule MoorlandWeb.ScriptLive.Editor do
           </div>
         </div>
 
-        <p :if={@stats.scene_count == 0 and @stats.words == 0} class="py-6 text-center text-sm text-base-content/40">
+        <p
+          :if={@stats.scene_count == 0 and @stats.words == 0}
+          class="py-6 text-center text-sm text-base-content/40"
+        >
           Statistics appear once there is something to count.
         </p>
       </div>
@@ -1754,10 +1781,19 @@ defmodule MoorlandWeb.ScriptLive.Editor do
 
         <div :for={collab <- @collaborators} class="flex items-center justify-between gap-2 px-4 py-3">
           <div class="min-w-0 flex-1 truncate text-sm">{collab.user.email}</div>
-          <form :if={@role == :owner} id={"role-form-#{collab.id}"} phx-change="update_role" class="shrink-0">
+          <form
+            :if={@role == :owner}
+            id={"role-form-#{collab.id}"}
+            phx-change="update_role"
+            class="shrink-0"
+          >
             <input type="hidden" name="collab_id" value={collab.id} />
             <select name="role" class="select select-bordered select-xs">
-              <option :for={r <- Moorland.Scripts.Collaborator.roles()} value={r} selected={collab.role == r}>
+              <option
+                :for={r <- Moorland.Scripts.Collaborator.roles()}
+                value={r}
+                selected={collab.role == r}
+              >
                 {String.capitalize(r)}
               </option>
             </select>
@@ -1819,7 +1855,10 @@ defmodule MoorlandWeb.ScriptLive.Editor do
 
   defp title_form_modal(assigns) do
     ~H"""
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6" phx-click="close_title_form">
+    <div
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6"
+      phx-click="close_title_form"
+    >
       <div
         class="w-full max-w-md overflow-hidden rounded-xl bg-base-100 shadow-2xl"
         phx-click-away="close_title_form"
@@ -1831,16 +1870,19 @@ defmodule MoorlandWeb.ScriptLive.Editor do
           </button>
         </div>
         <form id="title-page-form" phx-submit="apply_title_page" class="space-y-2.5 p-5">
-          <label :for={
-            {key, label, placeholder} <- [
-              {"title", "Title", "The name of the script"},
-              {"credit", "Credit", "Written by"},
-              {"author", "Author", "Your name"},
-              {"source", "Based on", "Optional source material"},
-              {"draft_date", "Draft date", "Optional"},
-              {"copyright", "Copyright", "Optional"}
-            ]
-          } class="block">
+          <label
+            :for={
+              {key, label, placeholder} <- [
+                {"title", "Title", "The name of the script"},
+                {"credit", "Credit", "Written by"},
+                {"author", "Author", "Your name"},
+                {"source", "Based on", "Optional source material"},
+                {"draft_date", "Draft date", "Optional"},
+                {"copyright", "Copyright", "Optional"}
+              ]
+            }
+            class="block"
+          >
             <span class="text-[11px] text-base-content/50">{label}</span>
             <input
               type="text"
@@ -1877,7 +1919,10 @@ defmodule MoorlandWeb.ScriptLive.Editor do
 
   defp diff_modal(assigns) do
     ~H"""
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6" phx-click="close_diff">
+    <div
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6"
+      phx-click="close_diff"
+    >
       <div
         class="flex max-h-full w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-base-100 shadow-2xl"
         phx-click-away="close_diff"
@@ -1889,8 +1934,9 @@ defmodule MoorlandWeb.ScriptLive.Editor do
                 Calendar.strftime(@diff.version.inserted_at, "%b %d, %Y %H:%M")} → current
             </h3>
             <p class="text-[11px] text-base-content/50">
-              <span class="text-error">removed</span> lines were in the version;
-              <span class="text-success">added</span> lines are in the current draft.
+              <span class="text-error">removed</span>
+              lines were in the version; <span class="text-success">added</span>
+              lines are in the current draft.
             </p>
           </div>
           <div class="flex items-center gap-2">
@@ -1917,11 +1963,18 @@ defmodule MoorlandWeb.ScriptLive.Editor do
               op == :ins &&
                 "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
             ]}
-          ><span class="select-none pr-2 text-base-content/30">{case op do
+          >
+            <span class="select-none pr-2 text-base-content/30">{case op do
               :del -> "-"
               :ins -> "+"
               :eq -> " "
-            end}</span>{if line == "", do: " ", else: line}</div>
+            end}</span>{if line ==
+                                                                                                                                                                      "",
+                                                                                                                                                                    do:
+                                                                                                                                                                      " ",
+                                                                                                                                                                    else:
+                                                                                                                                                                      line}
+          </div>
         </div>
       </div>
     </div>

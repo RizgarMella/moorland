@@ -140,7 +140,11 @@ defmodule MoorlandWeb.ScriptLive.Index do
             <.link navigate={~p"/contacts"} class="btn btn-ghost btn-sm" title="Cast & crew rolodex">
               <.icon name="hero-identification" class="size-4" /> Contacts
             </.link>
-            <.link navigate={~p"/peers"} class="btn btn-ghost btn-sm" title="Peer-to-peer collaboration">
+            <.link
+              navigate={~p"/peers"}
+              class="btn btn-ghost btn-sm"
+              title="Peer-to-peer collaboration"
+            >
               <.icon name="hero-signal" class="size-4" /> Peers
             </.link>
           </div>
@@ -300,9 +304,8 @@ defmodule MoorlandWeb.ScriptLive.Index do
               >
                 <div class="font-medium text-base-content truncate pr-8">{script.title}</div>
                 <div class="mt-1 text-xs text-base-content/50">
-                  via {Map.get(@peer_names, script.origin_public_key, "unknown peer")}
-                  · {script.origin_role || "editor"}
-                  · updated {Calendar.strftime(script.updated_at, "%b %d, %Y at %H:%M")}
+                  via {Map.get(@peer_names, script.origin_public_key, "unknown peer")} · {script.origin_role ||
+                    "editor"} · updated {Calendar.strftime(script.updated_at, "%b %d, %Y at %H:%M")}
                 </div>
               </.link>
               <button

@@ -59,7 +59,11 @@ defmodule MoorlandWeb.ContactLive.Index do
           </div>
         </div>
 
-        <form id="contact-create" phx-submit="create" class="mt-6 rounded-lg border border-base-300 p-4">
+        <form
+          id="contact-create"
+          phx-submit="create"
+          class="mt-6 rounded-lg border border-base-300 p-4"
+        >
           <div class="flex flex-wrap gap-2">
             <input
               type="text"
@@ -112,12 +116,17 @@ defmodule MoorlandWeb.ContactLive.Index do
                 <div class="flex items-baseline gap-2">
                   <span class="truncate text-sm font-medium">{contact.name}</span>
                   <span :if={contact.role} class="text-xs text-base-content/60">{contact.role}</span>
-                  <span :if={contact.department} class="rounded bg-base-200 px-1.5 text-[10px] uppercase text-base-content/50">
+                  <span
+                    :if={contact.department}
+                    class="rounded bg-base-200 px-1.5 text-[10px] uppercase text-base-content/50"
+                  >
                     {contact.department}
                   </span>
                 </div>
                 <div class="mt-0.5 text-[11px] text-base-content/50">
-                  {[contact.email, contact.phone] |> Enum.reject(&(&1 in [nil, ""])) |> Enum.join(" · ")}
+                  {[contact.email, contact.phone]
+                  |> Enum.reject(&(&1 in [nil, ""]))
+                  |> Enum.join(" · ")}
                 </div>
               </div>
               <button
@@ -147,13 +156,43 @@ defmodule MoorlandWeb.ContactLive.Index do
             >
               <input type="hidden" name="contact_id" value={contact.id} />
               <div class="flex flex-wrap gap-2">
-                <input type="text" name="name" required value={contact.name} class="input input-bordered input-sm min-w-40 flex-1" />
-                <input type="text" name="role" value={contact.role} placeholder="Role" class="input input-bordered input-sm min-w-40 flex-1" />
-                <input type="text" name="department" value={contact.department} placeholder="Department" class="input input-bordered input-sm w-36" />
+                <input
+                  type="text"
+                  name="name"
+                  required
+                  value={contact.name}
+                  class="input input-bordered input-sm min-w-40 flex-1"
+                />
+                <input
+                  type="text"
+                  name="role"
+                  value={contact.role}
+                  placeholder="Role"
+                  class="input input-bordered input-sm min-w-40 flex-1"
+                />
+                <input
+                  type="text"
+                  name="department"
+                  value={contact.department}
+                  placeholder="Department"
+                  class="input input-bordered input-sm w-36"
+                />
               </div>
               <div class="flex flex-wrap gap-2">
-                <input type="email" name="email" value={contact.email} placeholder="Email" class="input input-bordered input-sm min-w-40 flex-1" />
-                <input type="text" name="phone" value={contact.phone} placeholder="Phone" class="input input-bordered input-sm w-40" />
+                <input
+                  type="email"
+                  name="email"
+                  value={contact.email}
+                  placeholder="Email"
+                  class="input input-bordered input-sm min-w-40 flex-1"
+                />
+                <input
+                  type="text"
+                  name="phone"
+                  value={contact.phone}
+                  placeholder="Phone"
+                  class="input input-bordered input-sm w-40"
+                />
                 <button type="submit" class="btn btn-neutral btn-sm">Save</button>
                 <button type="button" phx-click="cancel_edit" class="btn btn-ghost btn-sm">Cancel</button>
               </div>

@@ -56,9 +56,7 @@ defmodule Moorland.Peers do
 
   @doc "Peers added by this user (peer trust is per-user, not per-install)."
   def list_peers(%Scope{user: user}) do
-    Repo.all(
-      from(p in Peer, where: p.added_by_user_id == ^user.id, order_by: [asc: p.name])
-    )
+    Repo.all(from(p in Peer, where: p.added_by_user_id == ^user.id, order_by: [asc: p.name]))
   end
 
   @doc "Adds a peer straight from a LAN discovery beacon."

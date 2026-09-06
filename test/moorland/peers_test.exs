@@ -98,7 +98,12 @@ defmodule Moorland.PeersTest do
       assert Scripts.peer_list_shared(pub) == []
     end
 
-    test "a stale peer save merges with local edits", %{scope: scope, script: script, peer: peer, pub: pub} do
+    test "a stale peer save merges with local edits", %{
+      scope: scope,
+      script: script,
+      peer: peer,
+      pub: pub
+    } do
       :ok = Scripts.set_peer_share(scope, script, peer.id, "editor")
 
       base = "INT. LAB - DAY\n\nThe machine hums.\n\nEXT. LOT - NIGHT\n\nRain falls."
@@ -161,7 +166,9 @@ defmodule Moorland.PeersTest do
       {_script, role} = Scripts.get_script!(scope, mirror.id)
       assert role == :viewer
 
-      {:ok, updated} = Scripts.apply_origin_content(mirror, "Their Script", "v2 text", 2, "editor")
+      {:ok, updated} =
+        Scripts.apply_origin_content(mirror, "Their Script", "v2 text", 2, "editor")
+
       assert updated.content == "v2 text"
       assert updated.origin_version == 2
       {_script, role} = Scripts.get_script!(scope, updated.id)

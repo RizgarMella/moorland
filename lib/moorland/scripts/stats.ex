@@ -71,10 +71,18 @@ defmodule Moorland.Scripts.Stats do
       next_line = Enum.at(lines, i + 1)
 
       cond do
-        t == "" -> {acc, false}
-        t == "===" -> {acc, false}
-        String.starts_with?(t, "#") -> {[{:section, String.replace(t, ~r/^#+\s*/, "")} | acc], false}
-        String.starts_with?(t, "=") -> {[{:synopsis, String.replace(t, ~r/^=\s*/, "")} | acc], false}
+        t == "" ->
+          {acc, false}
+
+        t == "===" ->
+          {acc, false}
+
+        String.starts_with?(t, "#") ->
+          {[{:section, String.replace(t, ~r/^#+\s*/, "")} | acc], false}
+
+        String.starts_with?(t, "=") ->
+          {[{:synopsis, String.replace(t, ~r/^=\s*/, "")} | acc], false}
+
         String.starts_with?(t, ">") and String.ends_with?(t, "<") ->
           {[{:centered, t} | acc], false}
 
@@ -116,9 +124,15 @@ defmodule Moorland.Scripts.Stats do
     next_blank = next_line == nil or String.trim(next_line) == ""
 
     cond do
-      String.starts_with?(t, "@") -> prev_blank and not next_blank
-      not prev_blank or next_blank -> false
-      t == "" or String.length(t) > 60 -> false
+      String.starts_with?(t, "@") ->
+        prev_blank and not next_blank
+
+      not prev_blank or next_blank ->
+        false
+
+      t == "" or String.length(t) > 60 ->
+        false
+
       true ->
         base = String.replace(t, ~r/\s*\([^)]*\)\s*$/, "")
 
@@ -179,9 +193,14 @@ defmodule Moorland.Scripts.Stats do
         Regex.match?(~r/^(INT\.\/EXT|INT\/EXT|I\/E)/, heading) ->
           %{acc | int: acc.int + 1, ext: acc.ext + 1}
 
-        String.starts_with?(heading, "INT") -> %{acc | int: acc.int + 1}
-        String.starts_with?(heading, "EXT") -> %{acc | ext: acc.ext + 1}
-        true -> %{acc | other: acc.other + 1}
+        String.starts_with?(heading, "INT") ->
+          %{acc | int: acc.int + 1}
+
+        String.starts_with?(heading, "EXT") ->
+          %{acc | ext: acc.ext + 1}
+
+        true ->
+          %{acc | other: acc.other + 1}
       end
     end)
   end

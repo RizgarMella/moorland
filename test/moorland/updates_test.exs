@@ -63,7 +63,9 @@ defmodule Moorland.UpdatesTest do
 
       assert banner.latest.tag == "v0.3.0"
       assert banner.current == "0.1.0"
-      assert [%{latest: true}, %{latest: false}, %{latest: false, current: true}] = banner.releases
+
+      assert [%{latest: true}, %{latest: false}, %{latest: false, current: true}] =
+               banner.releases
     end
 
     test "prereleases are skipped when choosing the headline version" do

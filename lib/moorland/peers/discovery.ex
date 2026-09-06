@@ -54,7 +54,8 @@ defmodule Moorland.Peers.Discovery do
       |> Enum.filter(&(&1.seen_at >= cutoff))
       |> Enum.sort_by(& &1.name)
 
-    {:reply, nearby, %{state | seen: Map.filter(state.seen, fn {_k, v} -> v.seen_at >= cutoff end)}}
+    {:reply, nearby,
+     %{state | seen: Map.filter(state.seen, fn {_k, v} -> v.seen_at >= cutoff end)}}
   end
 
   @impl true

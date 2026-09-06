@@ -8,7 +8,9 @@ defmodule Moorland.StorageTest do
   alias Moorland.Storage
 
   setup do
-    base = Path.join(System.tmp_dir!(), "moorland_storage_test_#{System.unique_integer([:positive])}")
+    base =
+      Path.join(System.tmp_dir!(), "moorland_storage_test_#{System.unique_integer([:positive])}")
+
     mirror_dir = Path.join(base, "scripts")
     pointer = Path.join(base, "data_dir_pointer")
 

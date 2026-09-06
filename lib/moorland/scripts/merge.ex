@@ -45,7 +45,8 @@ defmodule Moorland.Scripts.Merge do
     collect(rest, pos + n, [{pos, pos + n, []} | acc])
   end
 
-  defp collect([{:ins, lines} | rest], pos, acc), do: collect(rest, pos, [{pos, pos, lines} | acc])
+  defp collect([{:ins, lines} | rest], pos, acc),
+    do: collect(rest, pos, [{pos, pos, lines} | acc])
 
   # Adjacent delete+insert pairs form a single replace hunk.
   defp coalesce(hunks) do
