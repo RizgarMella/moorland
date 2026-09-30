@@ -154,7 +154,7 @@ it wrote; the origin's owner can delete anything and the next pull follows.
   strip; cast numbered by size of part; day totals in eighths. Drag and
   drop from Unscheduled and within the board, arrows for touch and
   keyboard; edit rights to change it. Left: peer sync of the board, and
-  day-out-of-days and call sheets, which read straight off it.
+  call sheets, which read straight off it.
 - **Shot lists & storyboards** [production] — per-scene shot tables created by
   highlighting a script line; storyboard images and mood boards stored in the
   data folder.
@@ -167,6 +167,9 @@ it wrote; the origin's owner can delete anything and the next pull follows.
   call times, locations with map/weather, attachments) distributed via peer
   sync or PDF/email with received/confirmed tracking. Biggest of the
   production set because it depends on breakdown and stripboard.
+  *Day out of days shipped (Sep 30 2026)* as a view of the stripboard
+  (`Schedule.day_out_of_days/1`: SW/W/WF/SWF/H per cast member per shoot
+  day, work and hold totals).
 
 ## Tier 4 — Epic (multi-week, architectural)
 

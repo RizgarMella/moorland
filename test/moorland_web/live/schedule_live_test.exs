@@ -131,4 +131,31 @@ defmodule MoorlandWeb.ScheduleLiveTest do
     render_hook(lv, "add_day", %{})
     assert Scripts.list_schedule_items(script) |> length() == 1
   end
+
+  test "day out of days codes the cast across shoot days", %{
+    conn: conn,
+    scope: scope,
+    script: script
+  } do
+    {:ok, _} = Scripts.schedule_scene(scope, script, %{heading: "INT. KITCHEN - DAY", line_no: 0})
+    {:ok, day} = Scripts.add_day_break(scope, script)
+    {:ok, _} = Scripts.update_day_break(scope, script, day.id, %{"shoot_date" => "2026-10-12"})
+
+    {:ok, _} =
+      Scripts.schedule_scene(scope, script, %{heading: "EXT. GARDEN - NIGHT", line_no: 5})
+
+    {:ok, lv, _html} = live(conn, ~p"/scripts/#{script.id}/schedule")
+    lv |> element("#view-dood") |> render_click()
+
+    assert has_element?(lv, "#dood thead", "12 Oct")
+    assert has_element?(lv, "#dood tbody th", "ANNA")
+    assert has_element?(lv, "#dood tbody tr:first-child td span", "SWF")
+    assert has_element?(lv, "#dood tbody tr:nth-child(2) td span", "SWF")
+    refute has_element?(lv, "#board")
+  end
+
+  test "day out of days is empty before anything is scheduled", %{conn: conn, script: script} do
+    {:ok, lv, _html} = live(conn, ~p"/scripts/#{script.id}/schedule?view=dood")
+    assert has_element?(lv, "#dood-empty")
+  end
 end

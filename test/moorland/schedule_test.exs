@@ -24,7 +24,16 @@ defmodule Moorland.Scripts.ScheduleTest do
   """
 
   defp item(attrs) do
-    Map.merge(%{id: System.unique_integer([:positive]), line_no: 0, heading: nil}, attrs)
+    Map.merge(
+      %{
+        id: System.unique_integer([:positive]),
+        line_no: 0,
+        heading: nil,
+        shoot_date: nil,
+        note: nil
+      },
+      attrs
+    )
   end
 
   defp strip(position, heading, line),
@@ -98,4 +107,72 @@ defmodule Moorland.Scripts.ScheduleTest do
   end
 
   defp stats_scenes, do: Moorland.Scripts.Stats.scenes(@script)
+
+  describe "shoot days and day out of days" do
+    @dood """
+    INT. ONE - DAY
+
+    ANNA
+    One.
+
+    INT. TWO - DAY
+
+    BEN
+    Two.
+
+    INT. THREE - DAY
+
+    ANNA
+    Three.
+
+    BEN
+    Three.
+
+    INT. FOUR - DAY
+
+    CARL
+    Four.
+    """
+
+    defp dood_board do
+      items = [
+        strip(0, "INT. ONE - DAY", 0),
+        item(%{kind: "day", position: 1, shoot_date: ~D[2026-10-12], note: "Stage 2"}),
+        strip(2, "INT. TWO - DAY", 5),
+        day(3),
+        day(4),
+        strip(5, "INT. THREE - DAY", 10),
+        day(6),
+        strip(7, "INT. FOUR - DAY", 18)
+      ]
+
+      Schedule.build(@dood, [], items)
+    end
+
+    test "lists each day with its scenes, cast and page total" do
+      days = dood_board().shoot_days
+
+      assert Enum.map(days, & &1.day) == [1, 2, 4, 5]
+      assert [%{date: ~D[2026-10-12], note: "Stage 2", scenes: [%{number: 1}]} | _] = days
+      assert List.last(days).date == nil
+      assert Enum.at(days, 2).cast == [1, 2]
+    end
+
+    test "codes each cast member's days" do
+      %{cast: rows} = Schedule.day_out_of_days(dood_board())
+      by_name = Map.new(rows, &{&1.name, &1})
+
+      # ANNA works days 1 and 4, held between; BEN works 2 and 4; CARL only 5.
+      assert by_name["ANNA"].codes == ["SW", "H", "WF", nil]
+      assert %{work: 2, hold: 1, start: 1, finish: 4} = by_name["ANNA"]
+      assert by_name["BEN"].codes == [nil, "SW", "WF", nil]
+      assert by_name["CARL"].codes == [nil, nil, nil, "SWF"]
+      assert %{work: 1, hold: 0} = by_name["CARL"]
+    end
+
+    test "leaves out cast who are not on the board" do
+      board = Schedule.build(@dood, [], [strip(0, "INT. FOUR - DAY", 18)])
+      assert [%{name: "CARL", codes: ["SWF"]}] = Schedule.day_out_of_days(board).cast
+    end
+  end
 end

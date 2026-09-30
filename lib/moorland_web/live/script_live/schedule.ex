@@ -32,9 +32,16 @@ defmodule MoorlandWeb.ScriptLive.Schedule do
      |> rebuild()}
   end
 
+  @impl true
+  def handle_params(params, _uri, socket) do
+    view = if params["view"] == "dood", do: "dood", else: "board"
+    {:noreply, assign(socket, :view, view)}
+  end
+
   defp rebuild(socket) do
     %{script: script, tags: tags, items: items} = socket.assigns
-    assign(socket, :board, Schedule.build(script.content, tags, items))
+    board = Schedule.build(script.content, tags, items)
+    assign(socket, board: board, dood: Schedule.day_out_of_days(board))
   end
 
   defp reload_items(socket) do
@@ -157,6 +164,16 @@ defmodule MoorlandWeb.ScriptLive.Schedule do
   defp day_label(nil), do: nil
   defp day_label(%Date{} = date), do: Calendar.strftime(date, "%a %-d %b %Y")
 
+  defp short_date(nil), do: nil
+  defp short_date(%Date{} = date), do: Calendar.strftime(date, "%-d %b")
+
+  defp code_class("SW"), do: "bg-success/15 text-success"
+  defp code_class("SWF"), do: "bg-primary/15 text-primary"
+  defp code_class("WF"), do: "bg-error/15 text-error"
+  defp code_class("W"), do: "bg-base-200"
+  defp code_class("H"), do: "bg-warning/15 text-warning"
+  defp code_class(_), do: nil
+
   ## Render
 
   @impl true
@@ -232,7 +249,35 @@ defmodule MoorlandWeb.ScriptLive.Schedule do
           </div>
         </dl>
 
-        <div class="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div class="mt-6 inline-flex items-center gap-0.5 rounded-lg bg-base-200 p-0.5 print:hidden">
+          <.link
+            :for={
+              {view, label, icon} <- [
+                {"board", "Board", "hero-bars-3"},
+                {"dood", "Day out of days", "hero-table-cells"}
+              ]
+            }
+            id={"view-#{view}"}
+            patch={
+              if(view == "board",
+                do: ~p"/scripts/#{@script.id}/schedule",
+                else: ~p"/scripts/#{@script.id}/schedule?view=dood"
+              )
+            }
+            class={[
+              "flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition",
+              @view == view && "bg-base-100 shadow-sm",
+              @view != view && "text-base-content/60 hover:text-base-content"
+            ]}
+          >
+            <.icon name={icon} class="size-4" />
+            {label}
+          </.link>
+        </div>
+
+        <.dood_table :if={@view == "dood"} dood={@dood} />
+
+        <div :if={@view == "board"} class="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
           <section>
             <div class="flex items-center justify-between gap-2 print:hidden">
               <h2 class="text-sm font-semibold">Board</h2>
@@ -413,6 +458,73 @@ defmodule MoorlandWeb.ScriptLive.Schedule do
         }
       </script>
     </Layouts.app>
+    """
+  end
+
+  attr :dood, :map, required: true
+
+  defp dood_table(assigns) do
+    ~H"""
+    <section id="dood" class="mt-6">
+      <div
+        :if={@dood.days == []}
+        id="dood-empty"
+        class="rounded-lg border border-dashed border-base-300 px-6 py-10 text-center text-sm text-base-content/50"
+      >
+        Put scenes on the board to see who works which day.
+      </div>
+
+      <div
+        :if={@dood.days != []}
+        class="inline-block max-w-full overflow-x-auto rounded-lg border border-base-300 align-top"
+      >
+        <table class="border-collapse text-xs">
+          <thead class="bg-base-200">
+            <tr>
+              <th class="sticky left-0 z-10 min-w-40 bg-base-200 px-3 py-2 text-left font-semibold">
+                Cast
+              </th>
+              <th :for={day <- @dood.days} class="min-w-12 px-1.5 py-2 text-center font-semibold">
+                <div>Day {day.day}</div>
+                <div :if={day.date} class="font-normal text-base-content/50">
+                  {short_date(day.date)}
+                </div>
+              </th>
+              <th
+                class="border-l border-base-300 px-2 py-2 text-center font-semibold"
+                title="Work days"
+              >
+                Work
+              </th>
+              <th class="px-2 py-2 text-center font-semibold" title="Hold days">Hold</th>
+              <th class="px-2 py-2 text-center font-semibold" title="Work and hold">Total</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-base-200">
+            <tr :for={row <- @dood.cast} id={"dood-#{row.number}"}>
+              <th class="sticky left-0 z-10 bg-base-100 px-3 py-1.5 text-left font-medium whitespace-nowrap">
+                <span class="mr-1 tabular-nums text-base-content/50">{row.number}.</span>{row.name}
+              </th>
+              <td :for={code <- row.codes} class="px-1 py-1 text-center">
+                <span
+                  :if={code}
+                  class={["inline-block min-w-8 rounded px-1 py-0.5 font-semibold", code_class(code)]}
+                >
+                  {code}
+                </span>
+              </td>
+              <td class="border-l border-base-300 px-2 text-center tabular-nums">{row.work}</td>
+              <td class="px-2 text-center tabular-nums">{row.hold}</td>
+              <td class="px-2 text-center font-semibold tabular-nums">{row.work + row.hold}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p :if={@dood.days != []} class="mt-3 text-xs text-base-content/50">
+        SW start work · W work · WF work finish · SWF start and finish the same day · H hold
+      </p>
+    </section>
     """
   end
 

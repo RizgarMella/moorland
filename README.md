@@ -104,6 +104,8 @@ locations, and a dialogue balance line from optional gender tags.
   same on a phone or from the keyboard.
 - **Strips follow the script.** Rewrite a heading from DAY to NIGHT and its
   strip keeps its place; cut the scene and the strip is flagged.
+- **Day out of days.** The cast-by-day grid, read straight off the board:
+  start, work, finish and hold days for every actor, with totals.
 
 ### Working with someone on another machine
 

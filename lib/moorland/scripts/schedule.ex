@@ -27,7 +27,10 @@ defmodule Moorland.Scripts.Schedule do
       the day's totals
 
   Strips after the last break form `:open_day` (`%{day, eighths, scenes}`),
-  or it is nil. `cast` is `[{number, name}]`.
+  or it is nil. `cast` is `[{number, name}]`. `shoot_days` lists every day
+  with strips on it, the open one included, as
+  `%{day, date, note, scenes, eighths, cast}` where `scenes` are the scene
+  maps in board order and `cast` the numbers working that day.
   """
   def build(text, tags, items) do
     breakdown = Breakdown.build(text, tags)
@@ -57,14 +60,97 @@ defmodule Moorland.Scripts.Schedule do
     unscheduled = Enum.reject(scenes, &MapSet.member?(claimed, &1.number))
     scheduled = Enum.filter(scenes, &MapSet.member?(claimed, &1.number))
 
+    rows = Enum.reverse(rows)
+
     %{
-      rows: Enum.reverse(rows),
+      rows: rows,
+      shoot_days: shoot_days(rows),
       open_day: if(acc.scenes > 0, do: Map.put(acc, :day, day)),
       unscheduled: Enum.map(unscheduled, &Map.put(&1, :cast_ids, scene_cast(&1, cast_ids))),
       cast: cast_ids |> Enum.map(fn {name, n} -> {n, name} end) |> Enum.sort(),
       days: Enum.count(items, &(&1.kind == "day")),
       scheduled_eighths: sum_eighths(scheduled),
       unscheduled_eighths: sum_eighths(unscheduled)
+    }
+  end
+
+  @doc """
+  Day out of days: for each cast member, what they do on each shoot day.
+  Codes follow the production standard - `"SW"` start work, `"W"` work,
+  `"WF"` work finish, `"SWF"` a single day, `"H"` held between work days,
+  `nil` not yet started or already finished. Returns
+  `%{days, cast: [%{number, name, codes, work, hold, start, finish}]}`
+  where `start` and `finish` are day numbers.
+  """
+  def day_out_of_days(%{shoot_days: days, cast: cast}) do
+    rows =
+      for {number, name} <- cast do
+        working = for d <- days, number in d.cast, do: d.day
+
+        case working do
+          [] ->
+            nil
+
+          [first | _] ->
+            last = List.last(working)
+
+            codes =
+              Enum.map(days, fn %{day: day} ->
+                cond do
+                  day == first and day == last -> "SWF"
+                  day == first -> "SW"
+                  day == last -> "WF"
+                  day in working -> "W"
+                  day > first and day < last -> "H"
+                  true -> nil
+                end
+              end)
+
+            %{
+              number: number,
+              name: name,
+              codes: codes,
+              work: length(working),
+              hold: Enum.count(codes, &(&1 == "H")),
+              start: first,
+              finish: last
+            }
+        end
+      end
+
+    %{days: days, cast: Enum.reject(rows, &is_nil/1)}
+  end
+
+  # Days are numbered as the board numbers its breaks; a day with no strips
+  # (two breaks in a row) keeps its number but is left out.
+  defp shoot_days(rows) do
+    {days, open, day} =
+      Enum.reduce(rows, {[], [], 1}, fn
+        %{kind: :strip} = row, {days, open, day} ->
+          {days, [row | open], day}
+
+        %{kind: :day, item: item}, {days, open, day} ->
+          {[new_day(day, item, open) | days], [], day + 1}
+
+        _missing, acc ->
+          acc
+      end)
+
+    [new_day(day, nil, open) | days]
+    |> Enum.reverse()
+    |> Enum.reject(&(&1.scenes == []))
+  end
+
+  defp new_day(day, item, strips) do
+    strips = Enum.reverse(strips)
+
+    %{
+      day: day,
+      date: item && item.shoot_date,
+      note: item && item.note,
+      scenes: Enum.map(strips, & &1.scene),
+      eighths: strips |> Enum.map(& &1.scene.eighths) |> Enum.sum(),
+      cast: strips |> Enum.flat_map(& &1.cast) |> Enum.uniq() |> Enum.sort()
     }
   end
 
