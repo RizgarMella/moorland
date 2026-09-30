@@ -1,6 +1,7 @@
 defmodule Moorland.Scripts.Activity do
   @moduledoc """
-  Comments, notes and version history travelling between installations.
+  Comments, notes, breakdown tags and version history travelling between
+  installations.
 
   The origin holds the truth for a script. A mirror pushes what its own
   users did - new or changed comments and notes, named snapshots, and
@@ -16,6 +17,10 @@ defmodule Moorland.Scripts.Activity do
 
   Trust on the origin side: a peer may add records and resolve any comment,
   but change or delete only records that arrived from that same peer.
+
+  Breakdown tags travel like notes. An origin from before tags existed sends
+  no `"tags"` list at all, and a mirror then leaves its tags alone rather
+  than reading the silence as "all deleted".
   """
 
   import Ecto.Query, warn: false
@@ -23,7 +28,7 @@ defmodule Moorland.Scripts.Activity do
   alias Moorland.Repo
   alias Moorland.Peers.Peer
   alias Moorland.Scripts
-  alias Moorland.Scripts.{Comment, Note, Script, Version}
+  alias Moorland.Scripts.{BreakdownTag, Comment, Note, Script, Version}
 
   # Mirrors push named snapshots and restore points; automatic snapshots are
   # local noise (the origin lays down its own on every merged save).
@@ -51,10 +56,19 @@ defmodule Moorland.Scripts.Activity do
         )
       )
 
+    {tag_count, tag_max} =
+      Repo.one(
+        from(t in BreakdownTag,
+          where: t.script_id == ^script_id,
+          select: {count(t.id), max(t.updated_at)}
+        )
+      )
+
     version_max =
       Repo.one(from(v in Version, where: v.script_id == ^script_id, select: max(v.id)))
 
-    "c#{comment_count}@#{stamp_part(comment_max)}|n#{note_count}@#{stamp_part(note_max)}|v#{version_max || 0}"
+    "c#{comment_count}@#{stamp_part(comment_max)}|n#{note_count}@#{stamp_part(note_max)}" <>
+      "|t#{tag_count}@#{stamp_part(tag_max)}|v#{version_max || 0}"
   end
 
   @doc "All comments and notes, plus versions after `after_id`, for a peer that may see the script."
@@ -88,10 +102,20 @@ defmodule Moorland.Scripts.Activity do
         )
       )
 
+    tags =
+      Repo.all(
+        from(t in BreakdownTag,
+          where: t.script_id == ^script.id,
+          order_by: [asc: t.id],
+          preload: [:author]
+        )
+      )
+
     %{
       stamp: stamp(script.id),
       comments: Enum.map(comments, &comment_payload/1),
       notes: Enum.map(notes, &note_payload/1),
+      tags: Enum.map(tags, &tag_payload/1),
       versions: Enum.map(versions, &version_payload/1)
     }
   end
@@ -125,6 +149,20 @@ defmodule Moorland.Scripts.Activity do
         end
       end)
 
+    tags? =
+      Enum.reduce(list(payload, "tags"), false, fn item, acc ->
+        case find(BreakdownTag, script.id, item["uid"]) do
+          nil ->
+            insert_tag(script, item, key, :origin) == :ok or acc
+
+          %BreakdownTag{peer_key: ^key} = existing ->
+            apply_tag_fields(existing, item, :origin) or acc
+
+          %BreakdownTag{} ->
+            acc
+        end
+      end)
+
     versions? =
       Enum.reduce(list(payload, "versions"), false, fn item, acc ->
         if item["kind"] in @pushed_version_kinds and find(Version, script.id, item["uid"]) == nil,
@@ -132,17 +170,20 @@ defmodule Moorland.Scripts.Activity do
           else: acc
       end)
 
-    {comments_deleted?, notes_deleted?} =
-      Enum.reduce(list(payload, "deletions"), {false, false}, fn item, {c, n} ->
+    {comments_deleted?, notes_deleted?, tags_deleted?} =
+      Enum.reduce(list(payload, "deletions"), {false, false, false}, fn item, {c, n, t} ->
         case {item["kind"], item["uid"]} do
-          {"comment", uid} -> {delete_own(Comment, script.id, uid, key) or c, n}
-          {"note", uid} -> {c, delete_own(Note, script.id, uid, key) or n}
-          _ -> {c, n}
+          {"comment", uid} -> {delete_own(Comment, script.id, uid, key) or c, n, t}
+          {"note", uid} -> {c, delete_own(Note, script.id, uid, key) or n, t}
+          {"breakdown_tag", uid} -> {c, n, delete_own(BreakdownTag, script.id, uid, key) or t}
+          _ -> {c, n, t}
         end
       end)
 
     changed =
       announce(script, comments? or comments_deleted?, notes? or notes_deleted?, versions?)
+
+    changed = announce_tags(script, tags? or tags_deleted?) or changed
 
     if changed, do: Scripts.nudge_peers(script)
     :ok
@@ -200,6 +241,15 @@ defmodule Moorland.Scripts.Activity do
         )
       )
 
+    tags =
+      Repo.all(
+        from(t in BreakdownTag,
+          where: t.script_id == ^mirror.id and t.rev > t.synced_rev,
+          order_by: [asc: t.id],
+          preload: [:author]
+        )
+      )
+
     deletions =
       Repo.all(
         from(d in "peer_deletions",
@@ -212,12 +262,14 @@ defmodule Moorland.Scripts.Activity do
       payload: %{
         comments: Enum.map(comments, &comment_payload/1),
         notes: Enum.map(notes, &note_payload/1),
+        tags: Enum.map(tags, &tag_payload/1),
         versions: Enum.map(versions, &version_payload/1),
         deletions: Enum.map(deletions, &Map.take(&1, [:kind, :uid]))
       },
       receipt: %{
         comments: Enum.map(comments, &{&1.id, &1.rev}),
         notes: Enum.map(notes, &{&1.id, &1.rev}),
+        tags: Enum.map(tags, &{&1.id, &1.rev}),
         versions: Enum.map(versions, & &1.id),
         deletions: Enum.map(deletions, & &1.id)
       }
@@ -225,7 +277,8 @@ defmodule Moorland.Scripts.Activity do
   end
 
   def empty?(%{payload: p}) do
-    p.comments == [] and p.notes == [] and p.versions == [] and p.deletions == []
+    p.comments == [] and p.notes == [] and p.tags == [] and p.versions == [] and
+      p.deletions == []
   end
 
   @doc "After the origin accepted a push: everything unchanged since is now in sync."
@@ -237,6 +290,11 @@ defmodule Moorland.Scripts.Activity do
 
     for {id, rev} <- receipt.notes do
       from(n in Note, where: n.id == ^id and n.rev == ^rev)
+      |> Repo.update_all(set: [synced_rev: rev])
+    end
+
+    for {id, rev} <- Map.get(receipt, :tags, []) do
+      from(t in BreakdownTag, where: t.id == ^id and t.rev == ^rev)
       |> Repo.update_all(set: [synced_rev: rev])
     end
 
@@ -299,6 +357,28 @@ defmodule Moorland.Scripts.Activity do
     comments_gone? = delete_missing(Comment, mirror.id, Enum.map(comment_items, & &1["uid"]))
     notes_gone? = delete_missing(Note, mirror.id, Enum.map(note_items, & &1["uid"]))
 
+    tags? =
+      if is_list(data["tags"]) do
+        tag_items = list(data, "tags")
+
+        changed? =
+          Enum.reduce(tag_items, false, fn item, acc ->
+            case find(BreakdownTag, mirror.id, item["uid"]) do
+              nil ->
+                insert_tag(mirror, item, key, :mirror) == :ok or acc
+
+              %BreakdownTag{} = existing ->
+                if pending?(existing),
+                  do: acc,
+                  else: apply_tag_fields(existing, item, :mirror) or acc
+            end
+          end)
+
+        delete_missing(BreakdownTag, mirror.id, Enum.map(tag_items, & &1["uid"])) or changed?
+      else
+        false
+      end
+
     now = DateTime.utc_now(:second)
 
     versions? =
@@ -323,6 +403,7 @@ defmodule Moorland.Scripts.Activity do
       |> Repo.update()
 
     announce(mirror, comments? or comments_gone?, notes? or notes_gone?, versions?)
+    announce_tags(mirror, tags?)
     {:ok, mirror}
   end
 
@@ -428,6 +509,55 @@ defmodule Moorland.Scripts.Activity do
     end
   end
 
+  defp insert_tag(script, item, peer_key, side) do
+    fields = tag_fields(item)
+
+    if fields[:name] == "" or fields[:category] == nil or not is_binary(item["uid"]) do
+      :skip
+    else
+      %BreakdownTag{
+        script_id: script.id,
+        uid: item["uid"],
+        remote_author: handle_from(item),
+        peer_key: peer_key,
+        inserted_at: parse_time(item["inserted_at"])
+      }
+      |> Ecto.Changeset.change(fields ++ arrival_changes(side))
+      |> Repo.insert(on_conflict: :nothing)
+      |> case do
+        {:ok, %BreakdownTag{id: id}} when is_integer(id) -> :ok
+        _ -> :skip
+      end
+    end
+  end
+
+  defp apply_tag_fields(existing, item, side) do
+    fields = tag_fields(item)
+
+    if fields[:name] == "" or fields[:category] == nil or
+         Enum.all?(fields, fn {k, v} -> Map.get(existing, k) == v end) do
+      false
+    else
+      existing
+      |> Ecto.Changeset.change(fields ++ update_changes(existing, side))
+      |> Repo.update!()
+
+      true
+    end
+  end
+
+  defp tag_fields(item) do
+    anchor = clip(item["anchor_text"], 200)
+
+    [
+      category: if(item["category"] in BreakdownTag.category_keys(), do: item["category"]),
+      name: item["name"] |> clip(120) |> String.trim(),
+      anchor_text: if(anchor == "", do: nil, else: anchor),
+      line_no:
+        if(is_integer(item["line_no"]) and item["line_no"] >= 0, do: item["line_no"], else: 0)
+    ]
+  end
+
   defp insert_version(script, item, peer_key, extra) do
     if is_binary(item["uid"]) do
       %Version{
@@ -473,6 +603,13 @@ defmodule Moorland.Scripts.Activity do
     count > 0
   end
 
+  defp announce_tags(script, true) do
+    Scripts.broadcast(script.id, {:breakdown_changed, script.id})
+    true
+  end
+
+  defp announce_tags(_script, false), do: false
+
   defp announce(script, comments?, notes?, versions?) do
     if comments?, do: Scripts.broadcast(script.id, {:comments_changed, script.id})
     if notes?, do: Scripts.broadcast(script.id, {:notes_changed, script.id})
@@ -503,6 +640,18 @@ defmodule Moorland.Scripts.Activity do
       pinned: n.pinned,
       author: handle(n),
       inserted_at: iso(n.inserted_at)
+    }
+  end
+
+  defp tag_payload(t) do
+    %{
+      uid: t.uid,
+      category: t.category,
+      name: t.name,
+      anchor_text: t.anchor_text,
+      line_no: t.line_no,
+      author: handle(t),
+      inserted_at: iso(t.inserted_at)
     }
   end
 

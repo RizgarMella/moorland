@@ -632,6 +632,7 @@ defmodule Moorland.Scripts do
       |> case do
         {:ok, tag} ->
           broadcast(script.id, {:breakdown_changed, script.id})
+          nudge_peers(script)
           {:ok, Repo.preload(tag, :author)}
 
         error ->
@@ -645,8 +646,10 @@ defmodule Moorland.Scripts do
     with %BreakdownTag{script_id: sid} = tag when sid == script.id <-
            Repo.get(BreakdownTag, tag_id),
          true <- tag.author_id == user.id or can_edit?(role(scope, script)) do
+      Activity.remember_deletion(script, "breakdown_tag", tag)
       Repo.delete(tag)
       broadcast(script.id, {:breakdown_changed, script.id})
+      nudge_peers(script)
       :ok
     else
       _ -> {:error, :not_allowed}
@@ -675,6 +678,7 @@ defmodule Moorland.Scripts do
         nil ->
           Repo.transaction(fn -> Enum.each(changesets, &Repo.update!/1) end)
           broadcast(script.id, {:breakdown_changed, script.id})
+          if changesets != [], do: nudge_peers(script)
           {:ok, length(changesets)}
 
         invalid ->
@@ -815,7 +819,7 @@ defmodule Moorland.Scripts do
     end
   end
 
-  @doc "Applies comments, notes, snapshots and deletions pushed by an editor peer."
+  @doc "Applies comments, notes, breakdown tags, snapshots and deletions pushed by an editor peer."
   def peer_apply_activity(public_key, script_id, payload) when is_map(payload) do
     case peer_share_for(public_key, script_id) do
       %PeerShare{role: "editor"} ->

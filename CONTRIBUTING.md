@@ -55,7 +55,8 @@ lib/moorland/
                            lives here; every function takes a %Scope{} first.
   scripts/merge.ex         Line based three way merge (the collaboration core)
   scripts/content_cache.ex Recent version cache and per script save lock
-  scripts/activity.ex      Comments, notes and history sync between installs
+  scripts/activity.ex      Comments, notes, breakdown tags and history sync
+                           between installs
   scripts/stats.ex         Report computation (Elixir port of the classifier)
                            and the scene list (lines, eighths, speaking cast)
   scripts/breakdown.ex     Breakdown as pure functions: places tags in scenes

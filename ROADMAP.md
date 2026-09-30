@@ -140,9 +140,10 @@ it wrote; the origin's owner can delete anything and the next pull follows.
   13 standard categories with colours; Tag in the preview's selection bubble
   and a Breakdown panel in the editor; `/scripts/:id/breakdown` with printable
   scene sheets (eighths, INT/EXT, time of day, speaking cast seeded) and a
-  department view with rename/recategorise. Left: peer sync of tags (the
-  sync fields are in place), CSV export, and the stripboard that grows out
-  of the scene sheets.
+  department view with rename/recategorise. Tags sync between installs
+  through `Scripts.Activity` exactly like notes (a peer changes or deletes
+  only its own tags at the origin). Left: CSV export, and the stripboard
+  that grows out of the scene sheets.
 - **Stripboard / shooting schedule** [production] — scenes as colored strips
   (INT/EXT, day/night, page-eighths from the pagination model) dragged into
   shoot days; grows out of the scene navigator's drag-reorder.
