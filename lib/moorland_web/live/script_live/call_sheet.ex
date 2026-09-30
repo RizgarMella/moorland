@@ -10,7 +10,8 @@ defmodule MoorlandWeb.ScriptLive.CallSheet do
   """
   use MoorlandWeb, :live_view
 
-  import MoorlandWeb.BreakdownComponents, only: [eighths: 1, int_ext_label: 1, category_dot: 1]
+  import MoorlandWeb.BreakdownComponents,
+    only: [eighths: 1, int_ext_label: 1, category_dot: 1, scene_label: 1]
 
   alias Moorland.Contacts
   alias Moorland.Scripts
@@ -336,7 +337,7 @@ defmodule MoorlandWeb.ScriptLive.CallSheet do
                   </thead>
                   <tbody class="divide-y divide-base-200 print:divide-black/30">
                     <tr :for={scene <- @sheet.day.scenes} class="align-top">
-                      <td class="py-1.5 pr-3 font-semibold tabular-nums">{scene.number}</td>
+                      <td class="py-1.5 pr-3 font-semibold tabular-nums">{scene_label(scene)}</td>
                       <td class="py-1.5 pr-3">
                         <div class="font-mono text-xs font-semibold">
                           {int_ext_label(scene.int_ext)}. {scene.location}
@@ -424,7 +425,7 @@ defmodule MoorlandWeb.ScriptLive.CallSheet do
                 </dt>
                 <dd class="min-w-0">
                   {Enum.map_join(elements, ", ", fn el ->
-                    "#{el.name} (#{Enum.join(el.scenes, ", ")})"
+                    "#{el.name} (#{Enum.map_join(el.scenes, ", ", &scene_label/1)})"
                   end)}
                 </dd>
               </div>
@@ -443,7 +444,7 @@ defmodule MoorlandWeb.ScriptLive.CallSheet do
             </h2>
             <ul class="mt-2 space-y-0.5 text-sm">
               <li :for={scene <- @sheet.next.scenes} class="flex gap-3">
-                <span class="w-6 font-semibold tabular-nums">{scene.number}</span>
+                <span class="w-8 font-semibold tabular-nums">{scene_label(scene)}</span>
                 <span class="min-w-0 flex-1 truncate font-mono text-xs leading-5">{scene.heading}</span>
                 <span class="tabular-nums text-base-content/60">{eighths(scene.eighths)}</span>
               </li>

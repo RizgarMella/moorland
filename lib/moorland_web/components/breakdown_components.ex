@@ -145,7 +145,7 @@ defmodule MoorlandWeb.BreakdownComponents do
         <div :if={@scene} id="breakdown-scene">
           <div class="flex items-baseline gap-2">
             <span class="text-xs font-semibold tabular-nums text-base-content/50">
-              {@scene.number}
+              {scene_label(@scene)}
             </span>
             <span class="min-w-0 flex-1 truncate font-mono text-xs font-semibold">
               {@scene.heading}
@@ -201,6 +201,13 @@ defmodule MoorlandWeb.BreakdownComponents do
     </div>
     """
   end
+
+  @doc """
+  A scene's number for display. A scene added to a locked script has none
+  until the numbers are extended, and shows a dash.
+  """
+  def scene_label(%{label: label}) when is_binary(label), do: label
+  def scene_label(_scene), do: "—"
 
   @doc "Scene elements as `[{category, entries}]` in breakdown-sheet order."
   def ordered_elements(elements) do

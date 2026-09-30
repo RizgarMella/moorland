@@ -65,6 +65,22 @@ defmodule Moorland.Scripts.BreakdownTest do
       assert Stats.scenes("INT. A - DAY") |> hd() |> Map.get(:synopsis) == nil
     end
 
+    test "reads fixed scene numbers, and leaves new scenes unlabelled once locked" do
+      text = "INT. A - DAY #1#\n\nOne.\n\n.FLASHBACK #1A#\n\nTwo.\n\nEXT. B - NIGHT\n\nNew."
+      [a, flash, new] = Stats.scenes(text)
+
+      assert %{number: 1, label: "1", heading: "INT. A - DAY", time: "DAY"} = a
+      assert %{number: 2, label: "1A", heading: "FLASHBACK"} = flash
+      assert %{number: 3, label: nil, heading: "EXT. B - NIGHT"} = new
+      assert Stats.compute(text).locations == [{"A", 1}, {"B", 1}, {"FLASHBACK", 1}]
+      assert Stats.split_scene_number("INT. X #12#") == {"INT. X", "12"}
+      assert Stats.split_scene_number("INT. X # not") == {"INT. X # not", nil}
+    end
+
+    test "labels scenes by count when nothing is locked" do
+      assert @script |> Stats.scenes() |> Enum.map(& &1.label) == ["1", "2"]
+    end
+
     test "is empty for a script without scenes" do
       assert Stats.scenes("Just some action.") == []
       assert Stats.scenes(nil) == []
@@ -170,8 +186,10 @@ defmodule Moorland.Scripts.BreakdownTest do
       depts =
         @script |> Breakdown.build([gun1, gun2, bar]) |> Breakdown.departments() |> Map.new()
 
-      assert [%{name: "Gun", scenes: [1, 2]}, %{name: "Crowbar", scenes: [1]}] = depts["props"]
-      assert [%{name: "MAYA", scenes: [1, 2]}, %{name: "RAY", scenes: [1]}] = depts["cast"]
+      numbers = fn els -> Enum.map(els, &{&1.name, Enum.map(&1.scenes, fn s -> s.number end)}) end
+      assert numbers.(depts["props"]) == [{"Gun", [1, 2]}, {"Crowbar", [1]}]
+      assert numbers.(depts["cast"]) == [{"MAYA", [1, 2]}, {"RAY", [1]}]
+      assert [%{scenes: [%{number: 1, label: "1"} | _]} | _] = depts["props"]
       assert depts["vfx"] == []
     end
   end

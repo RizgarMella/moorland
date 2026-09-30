@@ -162,7 +162,9 @@ defmodule Moorland.Scripts.Schedule do
       elements =
         scenes
         |> Enum.flat_map(fn scene ->
-          scene.elements |> Map.get(category, []) |> Enum.map(&{&1, scene.number})
+          scene.elements
+          |> Map.get(category, [])
+          |> Enum.map(&{&1, Map.take(scene, [:number, :label])})
         end)
         |> Enum.group_by(fn {entry, _n} -> entry.key end)
         |> Enum.map(fn {_key, [{first, _} | _] = rows} ->

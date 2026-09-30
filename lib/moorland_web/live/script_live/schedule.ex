@@ -8,7 +8,7 @@ defmodule MoorlandWeb.ScriptLive.Schedule do
   """
   use MoorlandWeb, :live_view
 
-  import MoorlandWeb.BreakdownComponents, only: [eighths: 1, int_ext_label: 1]
+  import MoorlandWeb.BreakdownComponents, only: [eighths: 1, int_ext_label: 1, scene_label: 1]
 
   alias Moorland.Scripts
   alias Moorland.Scripts.Schedule
@@ -372,7 +372,7 @@ defmodule MoorlandWeb.ScriptLive.Schedule do
                     @can_edit && "cursor-grab active:cursor-grabbing"
                   ]}
                 >
-                  <span class="w-6 shrink-0 font-semibold tabular-nums">{scene.number}</span>
+                  <span class="w-8 shrink-0 font-semibold tabular-nums">{scene_label(scene)}</span>
                   <span class="min-w-0 flex-1 truncate font-mono">{scene.heading}</span>
                   <span class="shrink-0 tabular-nums">{eighths(scene.eighths)}</span>
                   <button
@@ -561,7 +561,7 @@ defmodule MoorlandWeb.ScriptLive.Schedule do
         @can_edit && "cursor-grab active:cursor-grabbing"
       ]}
     >
-      <span class="font-semibold tabular-nums">{@row.scene.number}</span>
+      <span class="font-semibold tabular-nums">{scene_label(@row.scene)}</span>
       <span class="font-medium">{int_ext_label(@row.scene.int_ext)}</span>
       <span class="min-w-0 truncate font-mono" title={@row.scene.heading}>
         {@row.scene.location}

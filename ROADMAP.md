@@ -130,6 +130,12 @@ it wrote; the origin's owner can delete anything and the next pull follows.
   (prose/novel now developed under Directions below).
 - **Production drafts** [production] — locked pages, colored revision drafts,
   scene numbers frozen for the shoot (builds on Revision mode).
+  *Scene numbers shipped (Sep 30 2026):* "Lock scene numbers" in the scene
+  navigator writes Fountain `#12#` numbers into the headings (plain text,
+  survives any tool, round-trips through FDX's Number attribute); scenes
+  added later show no number until "Number new scenes" gives them
+  production numbers (12A, A1). Breakdown, stripboard and call sheets show
+  these labels. Left: locked pages and coloured revision drafts.
 - **Script breakdown** [production] — tag scene elements (cast, props,
   wardrobe, SFX/VFX…) by highlighting preview text (the comment-anchoring
   mechanism); auto-seed cast/locations from the parser; per-scene sheets and

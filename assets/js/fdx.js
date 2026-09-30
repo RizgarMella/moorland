@@ -45,7 +45,9 @@ export function fountainToFdx(text) {
     if (!type) continue
     const body = stripMarkup(el.text || "")
     if (body === "") continue
-    paras.push(`    <Paragraph Type="${type}"><Text>${esc(body)}</Text></Paragraph>`)
+    // A fixed scene number travels as Final Draft's own Number attribute.
+    const number = el.type === "scene" && el.number ? ` Number="${esc(el.number)}"` : ""
+    paras.push(`    <Paragraph${number} Type="${type}"><Text>${esc(body)}</Text></Paragraph>`)
   }
 
   let titleXml = ""
@@ -100,8 +102,10 @@ export function fdxToFountain(xml) {
     switch (type) {
       case "Scene Heading": {
         const heading = text.toUpperCase()
+        const number = (p.getAttribute("Number") || "").trim()
+        const suffix = /^[A-Za-z0-9.\-]+$/.test(number) ? ` #${number}#` : ""
         // Force non-standard headings (e.g. "FLASHBACK") with Fountain's "." marker.
-        out.push("", FOUNTAIN_SCENE_RE.test(heading) ? heading : `.${heading}`)
+        out.push("", (FOUNTAIN_SCENE_RE.test(heading) ? heading : `.${heading}`) + suffix)
         break
       }
       case "Character":

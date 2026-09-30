@@ -9,7 +9,13 @@ import {
   EXTENSIONS,
 } from "./fountain"
 import { smartFormatOnEnter, tidyDocument } from "./smart_format"
-import { sceneList, navList, moveScene } from "./scene_tools"
+import {
+  sceneList,
+  navList,
+  moveScene,
+  lockSceneNumbers,
+  clearSceneNumbers,
+} from "./scene_tools"
 import { fountainToFdx } from "./fdx"
 import { applyUI, autoHideHeader, typewriterOn } from "./ui_prefs"
 import { markTags } from "./breakdown_marks"
@@ -421,6 +427,8 @@ export const ScreenplayEditor = {
       return
     }
 
+    const locked = rows.some((row) => row.kind === "scene" && row.number)
+
     rows.forEach((row) => {
       const item = document.createElement("div")
       item.dataset.line = row.line
@@ -445,9 +453,9 @@ export const ScreenplayEditor = {
       item.className = "scene-nav-item"
       item.draggable = this.canEdit
       item.dataset.index = row.index
-      item.innerHTML =
-        `<span class="scene-nav-no">${row.index + 1}</span>` +
-        `<span class="scene-nav-text"></span>`
+      item.innerHTML = `<span class="scene-nav-no"></span><span class="scene-nav-text"></span>`
+      item.querySelector(".scene-nav-no").textContent =
+        row.number || (locked ? "" : String(row.index + 1))
       item.querySelector(".scene-nav-text").textContent = row.text
       item.addEventListener("click", () => this.jumpToLine(row.line))
 
@@ -475,7 +483,47 @@ export const ScreenplayEditor = {
 
       this.sceneNav.appendChild(item)
     })
+
+    if (this.canEdit && rows.some((row) => row.kind === "scene")) {
+      this.sceneNav.appendChild(this.sceneNumberActions(rows, locked))
+    }
     this.markActiveScene()
+  },
+
+  // Lock writes each scene's number into its heading (#12#) so inserting or
+  // cutting scenes no longer renumbers the rest; new scenes then take the
+  // production style 12A. Undo reverts either action.
+  sceneNumberActions(rows, locked) {
+    const bar = document.createElement("div")
+    bar.className = "scene-nav-actions"
+    const unnumbered = rows.some((row) => row.kind === "scene" && !row.number)
+
+    const button = (label, title, transform) => {
+      const b = document.createElement("button")
+      b.type = "button"
+      b.textContent = label
+      b.title = title
+      b.addEventListener("click", () => {
+        const before = this.textarea.value
+        const after = transform(before)
+        if (after !== before) this.replaceRange(0, before.length, after)
+      })
+      bar.appendChild(b)
+    }
+
+    if (!locked) {
+      button(
+        "Lock scene numbers",
+        "Write each scene's number into its heading, so numbers stay put for the shoot",
+        lockSceneNumbers
+      )
+    } else {
+      if (unnumbered) {
+        button("Number new scenes", "Give scenes added since the lock numbers like 12A", lockSceneNumbers)
+      }
+      button("Unlock", "Remove the fixed numbers so scenes number themselves again", clearSceneNumbers)
+    }
+    return bar
   },
 
   markActiveScene() {

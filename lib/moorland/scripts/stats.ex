@@ -38,7 +38,10 @@ defmodule Moorland.Scripts.Stats do
   end
 
   @doc """
-  Every scene in document order, numbered from 1 as the preview numbers them.
+  Every scene in document order. `number` counts from 1 and identifies the
+  scene within this text; `label` is the scene number to show: its fixed
+  `#number#` if it has one, else its count, unless other scenes have fixed
+  numbers (a locked script), when a new unnumbered scene's label is nil.
   `line` and `end_line` are 0-based source lines (the heading, and the last
   line before the next heading). `eighths` is the scene's length in eighths
   of a page, never less than one; `cast` lists who speaks in it;
@@ -62,14 +65,40 @@ defmodule Moorland.Scripts.Stats do
       end)
 
     scenes = close_scene(current, scenes) |> Enum.reverse()
+    raw = (text || "") |> String.split("\n") |> List.to_tuple()
+
+    fixed =
+      Enum.map(scenes, fn scene ->
+        raw |> elem(scene.line) |> String.trim() |> split_scene_number() |> elem(1)
+      end)
+
+    locked? = Enum.any?(fixed)
 
     scenes
+    |> Enum.zip(fixed)
     |> Enum.with_index()
-    |> Enum.map(fn {scene, i} ->
+    |> Enum.map(fn {{scene, fixed}, i} ->
       next = Enum.at(scenes, i + 1)
       end_line = if next, do: next.line - 1, else: max(scene.line, line_count - 1)
-      Map.merge(scene, %{number: i + 1, end_line: end_line})
+      label = fixed || if(locked?, do: nil, else: Integer.to_string(i + 1))
+      Map.merge(scene, %{number: i + 1, label: label, end_line: end_line})
     end)
+  end
+
+  @scene_number_re ~r/\s*#([A-Za-z0-9.\-]+)#\s*$/
+
+  @doc """
+  Splits a Fountain scene number off a heading:
+  `INT. HOUSE - DAY #12A#` gives `{"INT. HOUSE - DAY", "12A"}`.
+  """
+  def split_scene_number(heading) do
+    case Regex.run(@scene_number_re, heading, return: :index) do
+      [{start, _len}, {num_start, num_len}] ->
+        {binary_part(heading, 0, start), binary_part(heading, num_start, num_len)}
+
+      nil ->
+        {heading, nil}
+    end
   end
 
   @doc "The location part of a scene heading: `INT. KITCHEN - NIGHT` gives `KITCHEN`."
@@ -212,8 +241,8 @@ defmodule Moorland.Scripts.Stats do
           {[{:centered, t, i} | acc], false}
 
         scene_heading?(t) and prev_blank ->
-          heading = t |> String.trim_leading(".") |> String.upcase()
-          {[{:scene, heading, i} | acc], false}
+          {heading, _number} = t |> String.trim_leading(".") |> split_scene_number()
+          {[{:scene, String.upcase(heading), i} | acc], false}
 
         transition?(t) and prev_blank ->
           {[{:transition, t, i} | acc], false}

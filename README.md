@@ -39,7 +39,9 @@ middle. It is free software built on an open format.
 - **Helper chips** in the preview offer fixes as you go: a missing DAY or
   NIGHT, a probable character name typo, a standard title page.
 - **Scene navigator.** Click to jump, drag to reorder whole scenes. Sections
-  and inline notes are listed too.
+  and inline notes are listed too. **Lock scene numbers** for the shoot:
+  numbers are written into the headings (`#12#`, standard Fountain), and
+  scenes added later become 12A, 12B rather than renumbering the rest.
 - **Focus.** The toolbar hides while you type. Collapse either pane, go
   fullscreen, switch on typewriter scrolling, and pick your paper colour and
   font. Light and dark themes. Works on a phone or tablet.

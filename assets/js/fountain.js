@@ -83,6 +83,15 @@ function splitTitlePage(lines) {
   return [pairs, i]
 }
 
+// A scene heading's fixed number, Fountain style: "INT. HOUSE - DAY #12A#".
+// Returns [heading without it, number or null].
+const SCENE_NUMBER_RE = /\s*#([A-Za-z0-9.\-]+)#\s*$/
+
+export function splitSceneNumber(heading) {
+  const m = heading.match(SCENE_NUMBER_RE)
+  return m ? [heading.slice(0, m.index), m[1]] : [heading, null]
+}
+
 // Blanks out /* boneyard */ while preserving line numbering.
 function stripBoneyard(text) {
   return text.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ""))
@@ -122,7 +131,8 @@ export function parse(text) {
       inDialogue = false
     } else if (isSceneHeading(line) && prevBlank) {
       const heading = t.startsWith(".") ? t.slice(1) : t
-      elements.push({ type: "scene", text: heading.toUpperCase(), line: i })
+      const [bare, number] = splitSceneNumber(heading)
+      elements.push({ type: "scene", text: bare.toUpperCase(), number, line: i })
       inDialogue = false
     } else if (isTransition(line) && prevBlank) {
       elements.push({
@@ -265,6 +275,9 @@ export function renderHtml(text, opts = {}) {
     }
   }
 
+  // Once any scene carries a fixed number the script is locked: scenes
+  // without one are new and show no number rather than renumbering others.
+  const locked = elements.some((el) => el.type === "scene" && el.number)
   let sceneNumber = 0
   let pageNo = 1
   let used = 0
@@ -303,8 +316,9 @@ export function renderHtml(text, opts = {}) {
           helpers && !hasTime
             ? ` <button class="fp-time-picker" data-line="${el.line}" title="Add a time of day">time&nbsp;&#9662;</button>`
             : ""
+        const label = el.number || (locked ? "" : String(sceneNumber))
         parts.push(
-          `<div class="fp-scene" ${ln}><span class="fp-scene-no">${sceneNumber}</span>${inline(el.text)}${chip}</div>`
+          `<div class="fp-scene" ${ln}><span class="fp-scene-no">${escapeHtml(label)}</span>${inline(el.text)}${chip}</div>`
         )
         break
       }

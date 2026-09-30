@@ -187,7 +187,7 @@ defmodule Moorland.Scripts.ScheduleTest do
       assert Enum.map(sheet.cast, &{&1.name, &1.code}) == [{"ANNA", "H"}, {"BEN", "SW"}]
       assert sheet.departments == []
 
-      assert [{"props", [%{name: "Kettle", scenes: [3]}]}] =
+      assert [{"props", [%{name: "Kettle", scenes: [%{number: 3, label: "3"}]}]}] =
                Schedule.call_sheet(board, 4).departments
 
       assert Schedule.call_sheet(board, 3) == nil

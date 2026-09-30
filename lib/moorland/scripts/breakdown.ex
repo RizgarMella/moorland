@@ -42,8 +42,9 @@ defmodule Moorland.Scripts.Breakdown do
   end
 
   @doc """
-  The department view: for every category, each element with the scene
-  numbers it appears in, from the `:scenes` of `build/2`.
+  The department view: for every category, each element with the scenes
+  it appears in (`%{number, label}`, in script order), from the `:scenes`
+  of `build/2`.
   """
   def departments(%{scenes: scenes}) do
     for {category, _label} <- BreakdownTag.categories() do
@@ -52,7 +53,7 @@ defmodule Moorland.Scripts.Breakdown do
         |> Enum.flat_map(fn scene ->
           scene.elements
           |> Map.get(category, [])
-          |> Enum.map(&{&1, scene.number})
+          |> Enum.map(&{&1, Map.take(scene, [:number, :label])})
         end)
         |> Enum.group_by(fn {entry, _n} -> entry.key end)
         |> Enum.map(fn {key, [{first, _} | _] = rows} ->
@@ -60,7 +61,7 @@ defmodule Moorland.Scripts.Breakdown do
             key: key,
             name: first.name,
             tagged: Enum.any?(rows, fn {entry, _n} -> entry.tags != [] end),
-            scenes: rows |> Enum.map(&elem(&1, 1)) |> Enum.uniq() |> Enum.sort()
+            scenes: rows |> Enum.map(&elem(&1, 1)) |> Enum.uniq() |> Enum.sort_by(& &1.number)
           }
         end)
         |> Enum.sort_by(&{-length(&1.scenes), &1.key})
@@ -80,7 +81,7 @@ defmodule Moorland.Scripts.Breakdown do
     rows =
       Enum.flat_map(scenes, fn scene ->
         base = [
-          scene.number,
+          scene.label || "",
           scene.heading,
           int_ext_text(scene.int_ext),
           scene.time || "",

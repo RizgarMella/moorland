@@ -333,7 +333,7 @@ defmodule MoorlandWeb.ScriptLive.Breakdown do
     >
       <header class="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-base-300 bg-base-200/50 px-4 py-2.5">
         <span class="flex size-7 items-center justify-center rounded-md bg-neutral text-xs font-semibold tabular-nums text-neutral-content">
-          {@scene.number}
+          {scene_label(@scene)}
         </span>
         <h2 class="min-w-0 flex-1 truncate font-mono text-sm font-semibold">{@scene.heading}</h2>
         <div class="flex items-center gap-3 text-[11px] font-medium uppercase tracking-wider text-base-content/60">
@@ -480,12 +480,12 @@ defmodule MoorlandWeb.ScriptLive.Breakdown do
             <span class="min-w-0 flex-1 text-sm">{el.name}</span>
             <span class="flex flex-wrap justify-end gap-1">
               <.link
-                :for={n <- el.scenes}
-                patch={~p"/scripts/#{@script.id}/breakdown?tab=scenes" <> "#scene-#{n}"}
+                :for={scene <- el.scenes}
+                patch={~p"/scripts/#{@script.id}/breakdown?tab=scenes" <> "#scene-#{scene.number}"}
                 class="rounded bg-base-200 px-1.5 text-[11px] tabular-nums text-base-content/70 transition hover:bg-base-300"
-                title={"Scene #{n}"}
+                title={"Scene #{scene_label(scene)}"}
               >
-                {n}
+                {scene_label(scene)}
               </.link>
             </span>
             <button
