@@ -204,6 +204,14 @@ it wrote; the origin's owner can delete anything and the next pull follows.
   rendezvous and relay fallback, so any two writers on the internet can link
   with only their codes.
 
+## Far future — see VISION.md
+
+Not a tier and not sized: `VISION.md` describes where Moorland is heading in the long run
+(an AI-enabled movie, show and podcast maker built as a reproducible virtual studio: fixed
+virtual characters, a props database, sketch -> decompose -> generate -> reassemble scenes,
+conventional tooling for credits and overlays). It is context, not a commitment. Items
+below or in the tiers that move towards it cite `VISION.md` explicitly; nothing else does.
+
 ## Directions — unsized
 
 Owner directions from Sep 2026, not yet estimated or tiered: the place where

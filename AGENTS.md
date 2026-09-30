@@ -2,6 +2,7 @@ This is a web application written using the Phoenix web framework.
 
 ## Project guidelines
 
+- `VISION.md` describes the far-future direction (AI virtual studio). It is background only: **never** implement, scaffold, or "prepare for" anything from it unless a `ROADMAP.md` item explicitly cites `VISION.md`. `incoming/` holds reference material for that future and is not part of the build.
 - Use `mix precommit` alias when you are done with all changes and fix any pending issues
 - Use the already included and available `:req` (`Req`) library for HTTP requests, **avoid** `:httpoison`, `:tesla`, and `:httpc`. Req is included by default and is the preferred HTTP client for Phoenix apps
 
