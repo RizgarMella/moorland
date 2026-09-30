@@ -84,6 +84,7 @@ lib/moorland_web/
                                  drag and drop hook
   live/script_live/call_sheet.ex Printable call sheet for one shoot day
   components/breakdown_components.ex  Breakdown panel and shared pieces
+  components/revision_components.ex   Revision chip and History section
   live/peer_live/index.ex      Peers, storage, identity, update check
   live/contact_live/index.ex   Contacts
   controllers/peer_api_controller.ex  Peer wire endpoints (hello, envelope)
@@ -97,6 +98,7 @@ assets/js/
                          navigator, export and print
   scene_tools.js         Scene list and drag reorder (pure)
   breakdown_marks.js     Highlights breakdown tags in the preview
+  revisions.js           Revision marks: line diff against a set's base (pure)
   fdx.js                 Final Draft import and export
   ui_prefs.js            Distraction free chrome and fullscreen
   importer_hook.js       Dashboard file import

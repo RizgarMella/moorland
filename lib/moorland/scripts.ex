@@ -27,6 +27,7 @@ defmodule Moorland.Scripts do
     Activity,
     Breakdown,
     BreakdownTag,
+    RevisionSet,
     Schedule,
     ScheduleItem
   }
@@ -686,6 +687,55 @@ defmodule Moorland.Scripts do
         invalid ->
           {:error, invalid}
       end
+    end
+  end
+
+  ## Revision sets
+
+  def list_revision_sets(%Script{} = script) do
+    from(r in RevisionSet,
+      where: r.script_id == ^script.id,
+      order_by: [asc: r.id],
+      preload: [:author]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Starts the next revision set (Blue, then Pink...), keeping the script's
+  text as it stands now: from here on, lines that differ from it are
+  marked as changed in this set.
+  """
+  def start_revision(%Scope{user: user} = scope, %Script{} = script) do
+    with :ok <- authorize(scope, script, :edit) do
+      count = Repo.aggregate(from(r in RevisionSet, where: r.script_id == ^script.id), :count)
+
+      %RevisionSet{
+        script_id: script.id,
+        author_id: user.id,
+        color: RevisionSet.color_name(count),
+        # The saved text, not the caller's copy, which may be a save behind.
+        base_content:
+          Repo.one(from(s in Script, where: s.id == ^script.id, select: s.content)) || ""
+      }
+      |> Repo.insert()
+      |> case do
+        {:ok, set} ->
+          broadcast(script.id, {:revisions_changed, script.id})
+          {:ok, Repo.preload(set, :author)}
+
+        error ->
+          error
+      end
+    end
+  end
+
+  @doc "Ends revision mode: drops every set, so the script is a clean draft again."
+  def clear_revisions(%Scope{} = scope, %Script{} = script) do
+    with :ok <- authorize(scope, script, :edit) do
+      from(r in RevisionSet, where: r.script_id == ^script.id) |> Repo.delete_all()
+      broadcast(script.id, {:revisions_changed, script.id})
+      :ok
     end
   end
 

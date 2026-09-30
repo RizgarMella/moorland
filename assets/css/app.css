@@ -745,6 +745,58 @@ body.mo-typewriter [data-typewriter] {
   border-color: var(--color-base-content);
 }
 
+/* ---- Revision marks -------------------------------------------------------- */
+
+/* A changed line carries an asterisk in the right margin, as revised pages
+   do, and a faint wash of its revision set's colour on screen. */
+/* The asterisk is positioned against the page, not its block, so every
+   mark lines up in one column whatever the element's indent; with no top
+   given it stays level with the line it marks. */
+.screenplay[data-revision-color] {
+  position: relative;
+}
+
+.screenplay .fp-revised::after {
+  content: "*";
+  position: absolute;
+  right: 0.5rem;
+  font-weight: 700;
+  color: var(--rev, currentColor);
+}
+
+.screenplay[data-revision-color] .fp-revised {
+  background: color-mix(in srgb, var(--rev) 12%, transparent);
+}
+
+[data-revision-color="blue"] { --rev: #2563eb; }
+[data-revision-color="pink"] { --rev: #db2777; }
+[data-revision-color="yellow"] { --rev: #ca8a04; }
+[data-revision-color="green"] { --rev: #16a34a; }
+[data-revision-color="goldenrod"] { --rev: #b45309; }
+[data-revision-color="buff"] { --rev: #a16207; }
+[data-revision-color="salmon"] { --rev: #f97316; }
+[data-revision-color="cherry"] { --rev: #be123c; }
+
+.rev-swatch-blue { background: #bfdbfe; }
+.rev-swatch-pink { background: #fbcfe8; }
+.rev-swatch-yellow { background: #fef08a; }
+.rev-swatch-green { background: #bbf7d0; }
+.rev-swatch-goldenrod { background: #fcd34d; }
+.rev-swatch-buff { background: #f5e6c8; }
+.rev-swatch-salmon { background: #fdba74; }
+.rev-swatch-cherry { background: #fda4af; }
+
+@media print {
+  .print-screenplay .fp-revised {
+    background: none;
+  }
+
+  .print-screenplay .fp-revised::after {
+    color: #000;
+    right: -0.4in;
+  }
+}
+
 /* ---- Script breakdown ----------------------------------------------------- */
 
 /* One colour per breakdown category, shared by the chips in the Breakdown

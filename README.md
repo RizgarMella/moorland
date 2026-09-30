@@ -53,6 +53,13 @@ middle. It is free software built on an open format.
 - **Offline first.** Keep writing without a connection. Your work merges
   back when the connection returns.
 
+### Revisions
+
+- **Revision mode.** Once a draft is locked, start a revision and every
+  changed line gets an asterisk in the margin, on screen and in print. Sets
+  follow the production colours (Blue, Pink, Yellow, Green...), and you can
+  step back to see everything changed since any of them began.
+
 ### Collaboration
 
 - **Share by email** with a role: Editor, Commenter or Viewer. See who is in

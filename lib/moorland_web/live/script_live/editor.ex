@@ -3,6 +3,9 @@ defmodule MoorlandWeb.ScriptLive.Editor do
 
   import MoorlandWeb.BreakdownComponents, only: [breakdown_panel: 1, scene_for_line: 2]
 
+  import MoorlandWeb.RevisionComponents,
+    only: [revision_chip: 1, revision_section: 1, revision_label: 1]
+
   alias Moorland.Scripts
   alias Moorland.Scripts.{Breakdown, Stats}
   alias MoorlandWeb.Presence
@@ -42,10 +45,13 @@ defmodule MoorlandWeb.ScriptLive.Editor do
         tag_draft: nil,
         breakdown: nil,
         tags: Scripts.list_breakdown_tags(script),
+        revision_sets: Scripts.list_revision_sets(script),
+        revision_shown: nil,
         presences: presence_list(script.id)
       )
       |> load_panel_data()
       |> push_tags()
+      |> push_revision()
 
     {:ok, socket, layout: false}
   end
@@ -74,6 +80,30 @@ defmodule MoorlandWeb.ScriptLive.Editor do
       end
 
     push_event(socket, "breakdown_tags", %{tags: tags})
+  end
+
+  # The revision set whose changes are marked: the one picked in History,
+  # else the latest. Nil outside revision mode.
+  defp shown_revision(%{revision_sets: []}), do: nil
+
+  defp shown_revision(%{revision_sets: sets, revision_shown: id}),
+    do: Enum.find(sets, List.last(sets), &(&1.id == id))
+
+  defp push_revision(socket) do
+    payload =
+      case shown_revision(socket.assigns) do
+        nil ->
+          %{}
+
+        set ->
+          %{
+            base: set.base_content,
+            color: Moorland.Scripts.RevisionSet.color_key(set.color),
+            label: revision_label(set)
+          }
+      end
+
+    push_event(socket, "revision", payload)
   end
 
   defp build_breakdown(socket) do
@@ -167,6 +197,30 @@ defmodule MoorlandWeb.ScriptLive.Editor do
     for id <- String.split(ids, ",", trim: true),
         do: Scripts.delete_breakdown_tag(scope, script, id)
 
+    {:noreply, socket}
+  end
+
+  def handle_event("start_revision", _params, socket) do
+    %{current_scope: scope, script: script} = socket.assigns
+
+    case Scripts.start_revision(scope, script) do
+      {:ok, set} -> {:noreply, put_flash(socket, :info, "#{set.color} revision started.")}
+      {:error, _} -> {:noreply, put_flash(socket, :error, "Only editors can start a revision.")}
+    end
+  end
+
+  def handle_event("show_revision", %{"id" => id}, socket) do
+    shown = Enum.find(socket.assigns.revision_sets, &(to_string(&1.id) == id))
+
+    {:noreply,
+     socket
+     |> assign(:revision_shown, shown && shown.id)
+     |> push_revision()}
+  end
+
+  def handle_event("clear_revisions", _params, socket) do
+    %{current_scope: scope, script: script} = socket.assigns
+    Scripts.clear_revisions(scope, script)
     {:noreply, socket}
   end
 
@@ -597,6 +651,16 @@ defmodule MoorlandWeb.ScriptLive.Editor do
     {:noreply, load_panel_data(socket)}
   end
 
+  def handle_info({:revisions_changed, _id}, socket) do
+    {:noreply,
+     socket
+     |> assign(
+       revision_sets: Scripts.list_revision_sets(socket.assigns.script),
+       revision_shown: nil
+     )
+     |> push_revision()}
+  end
+
   def handle_info({:breakdown_changed, _id}, socket) do
     {:noreply,
      socket
@@ -669,7 +733,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
         <.icon name="hero-chevron-down" class="size-3.5" />
       </button>
 
-      <header class="editor-header flex h-12 shrink-0 items-center gap-3 border-b border-base-300 bg-base-100 px-3">
+      <header class="editor-header flex h-12 shrink-0 items-center gap-2 border-b border-base-300 bg-base-100 px-3 sm:gap-3">
         <.link navigate={~p"/scripts"} class="rounded p-1.5 text-base-content/60 hover:bg-base-200">
           <.icon name="hero-chevron-left" class="size-4" />
         </.link>
@@ -699,7 +763,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
           id="rename-form"
           phx-change="rename"
           phx-submit="rename"
-          class="min-w-0"
+          class="w-56 min-w-16 shrink"
         >
           <input
             type="text"
@@ -707,16 +771,18 @@ defmodule MoorlandWeb.ScriptLive.Editor do
             value={@script.title}
             phx-debounce="800"
             autocomplete="off"
-            class="w-56 truncate rounded border-0 bg-transparent px-1 py-0.5 text-sm font-medium focus:bg-base-200 focus:outline-none"
+            class="w-full truncate rounded border-0 bg-transparent px-1 py-0.5 text-sm font-medium focus:bg-base-200 focus:outline-none"
           />
         </form>
         <div :if={!Scripts.can_edit?(@role)} class="truncate text-sm font-medium">
           {@script.title}
         </div>
 
-        <span class="rounded-full bg-base-200 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-base-content/60">
+        <span class="hidden shrink-0 rounded-full bg-base-200 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-base-content/60 sm:inline">
           {role_label(@role)}
         </span>
+
+        <div class="hidden sm:block"><.revision_chip set={shown_revision(assigns)} /></div>
 
         <span
           id="save-status"
@@ -726,7 +792,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
           data-offline-text="Offline — changes kept locally"
         ></span>
 
-        <div class="ml-auto flex items-center gap-3">
+        <div class="ml-auto flex min-w-0 items-center gap-1.5 lg:shrink-0 xl:gap-3">
           <div class="dropdown dropdown-end">
             <div
               tabindex="0"
@@ -735,7 +801,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
               title="Export"
             >
               <.icon name="hero-arrow-down-tray" class="size-4" />
-              <span class="hidden lg:inline">Export</span>
+              <span class="hidden 2xl:inline">Export</span>
             </div>
             <ul
               tabindex="0"
@@ -764,7 +830,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
             </ul>
           </div>
 
-          <div class="dropdown dropdown-end">
+          <div class="dropdown dropdown-end hidden sm:block">
             <div
               tabindex="0"
               role="button"
@@ -827,13 +893,13 @@ defmodule MoorlandWeb.ScriptLive.Editor do
             </div>
           </div>
 
-          <Layouts.theme_toggle />
+          <div class="hidden lg:block"><Layouts.theme_toggle /></div>
 
           <button
             id="pin-header"
             type="button"
             onclick="moorlandUI.togglePin()"
-            class="rounded p-1.5 text-base-content/40 hover:bg-base-200"
+            class="hidden rounded p-1.5 text-base-content/40 hover:bg-base-200 lg:block"
             title="Pin the toolbar (unpinned, it slides away while you write)"
           >
             <.icon name="hero-map-pin" class="size-4" />
@@ -843,7 +909,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
             id="fullscreen-toggle"
             type="button"
             onclick="moorlandUI.toggleFullscreen()"
-            class="rounded p-1.5 text-base-content/40 hover:bg-base-200"
+            class="hidden rounded p-1.5 text-base-content/40 hover:bg-base-200 lg:block"
             title="Browser full screen (Esc leaves it)"
           >
             <.icon name="hero-arrows-pointing-out" class="fs-enter size-4" />
@@ -854,13 +920,13 @@ defmodule MoorlandWeb.ScriptLive.Editor do
             id="hide-header"
             type="button"
             onclick="moorlandUI.toggleHeader()"
-            class="rounded p-1.5 text-base-content/40 hover:bg-base-200"
+            class="hidden rounded p-1.5 text-base-content/40 hover:bg-base-200 lg:block"
             title="Hide the toolbar — the small chevron at the top of the page brings it back"
           >
             <.icon name="hero-chevron-up" class="size-4" />
           </button>
 
-          <div class="flex -space-x-1.5" title={Enum.join(@presences, ", ")}>
+          <div class="hidden -space-x-1.5 lg:flex" title={Enum.join(@presences, ", ")}>
             <span
               :for={email <- Enum.take(@presences, 5)}
               class="flex size-6 items-center justify-center rounded-full border-2 border-base-100 bg-neutral text-[10px] font-semibold text-neutral-content"
@@ -870,7 +936,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
             </span>
           </div>
 
-          <div class="flex items-center gap-0.5 rounded-lg bg-base-200 p-0.5">
+          <div class="flex min-w-16 items-center gap-0.5 overflow-x-auto rounded-lg bg-base-200 p-0.5 lg:shrink-0">
             <button
               :for={
                 {panel, icon, label} <- [
@@ -887,14 +953,14 @@ defmodule MoorlandWeb.ScriptLive.Editor do
               phx-click="toggle_panel"
               phx-value-panel={panel}
               class={[
-                "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition",
+                "flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition",
                 @panel == panel && "bg-base-100 shadow-sm",
                 @panel != panel && "text-base-content/60 hover:text-base-content"
               ]}
               title={label}
             >
               <.icon name={icon} class="size-4" />
-              <span class="hidden lg:inline">{label}</span>
+              <span class="hidden 2xl:inline">{label}</span>
               <span
                 :if={panel == "comments" && visible_comments(@comments, false) != []}
                 class="rounded-full bg-neutral px-1.5 text-[10px] text-neutral-content"
@@ -1013,7 +1079,14 @@ defmodule MoorlandWeb.ScriptLive.Editor do
             current_user_id={@current_scope.user.id}
           />
           <.lookup_panel :if={@panel == "lookup"} q={@lookup_q} result={@lookup_result} />
-          <.history_panel :if={@panel == "history"} versions={@versions} role={@role} />
+          <div :if={@panel == "history"}>
+            <.revision_section
+              sets={@revision_sets}
+              shown={shown_revision(assigns)}
+              role={@role}
+            />
+            <.history_panel versions={@versions} role={@role} />
+          </div>
           <.reports_panel
             :if={@panel == "reports"}
             stats={@stats}

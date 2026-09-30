@@ -19,6 +19,7 @@ import {
 import { fountainToFdx } from "./fdx"
 import { applyUI, autoHideHeader, typewriterOn } from "./ui_prefs"
 import { markTags } from "./breakdown_marks"
+import { changedLines, markRevisions } from "./revisions"
 
 const AUTOSAVE_MS = 1200
 const SCENE_START_RE = /^(INT\.\/EXT\.|INT\/EXT|INT\.?|EXT\.?|EST\.?|I\/E)\s+/i
@@ -78,6 +79,8 @@ export const ScreenplayEditor = {
     this.selectedIndex = 0
     this.pendingSelection = null
     this.breakdownTags = []
+    // Revision mode: the text the current revision set started from.
+    this.revision = null
 
     // The content_version our edits are built on - the merge base for saves.
     this.baseVersion = parseInt(this.el.dataset.contentVersion || "0", 10)
@@ -243,6 +246,10 @@ export const ScreenplayEditor = {
       this.refreshVocab()
     })
     this.handleEvent("save_error", () => this.setStatus("saving"))
+    this.handleEvent("revision", (revision) => {
+      this.revision = revision && revision.base !== undefined ? revision : null
+      this.renderPreview()
+    })
     this.handleEvent("breakdown_tags", ({ tags }) => {
       this.breakdownTags = tags
       this.renderPreview()
@@ -301,6 +308,16 @@ export const ScreenplayEditor = {
     root.innerHTML =
       (mark ? `<div class="print-watermark">${mark.replace(/[<>&"]/g, "")}</div>` : "") +
       renderHtml(this.textarea.value, { helpers: false, paginate: false })
+    this.markRevised(root)
+    root.dataset.revision = this.revision ? this.revision.label : ""
+  },
+
+  // Asterisks in the margin for lines changed in the revision being shown.
+  markRevised(container) {
+    if (!this.revision) return
+    const changed = changedLines(this.revision.base, this.textarea.value)
+    container.dataset.revisionColor = this.revision.color
+    markRevisions(container, changed)
   },
 
   doExport(format, watermark) {
@@ -615,6 +632,7 @@ export const ScreenplayEditor = {
     if (this.preview) {
       this.preview.innerHTML = renderHtml(this.textarea.value, { helpers: this.canEdit })
       markTags(this.preview, this.breakdownTags)
+      this.markRevised(this.preview)
     }
   },
 

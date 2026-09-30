@@ -125,6 +125,13 @@ it wrote; the origin's owner can delete anything and the next pull follows.
 - **Revision mode** [editor] — tracked changes: revision text in a chosen
   color with margin marks, steppable revision sets. Later feeds production's
   locked pages and colored draft revisions.
+  *Shipped (Sep 30 2026):* History → Revisions starts sets in production
+  order (Blue, Pink, Yellow... Double Blue), each keeping the saved text it
+  began from (`RevisionSet`). `revisions.js` diffs that base against the
+  live text (Myers, trimmed to the changed middle, ignoring fixed scene
+  numbers) and stars changed lines in the preview and in print; any set
+  can be picked to show changes since it began. Left: coloured page
+  headers and page-level locking, and peer sync of the sets.
 - **More document types & templates** [editor] — treatment, stage play,
   multi-cam, comic book, prose/novel (Markdown) with matching PDF layouts
   (prose/novel now developed under Directions below).
