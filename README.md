@@ -90,6 +90,20 @@ locations, and a dialogue balance line from optional gender tags.
   appears in. Rename or recategorise an element everywhere at once.
 - **Tags follow the words.** Rewrite or reorder scenes and each tag stays
   with its text. If the words are cut, the tag is flagged instead of lost.
+- **Spreadsheet export.** Download the whole breakdown as CSV.
+
+### Stripboard
+
+- **Every scene as a strip,** coloured the way paper boards are: white for
+  interior day, yellow for exterior day, blue for interior night, green for
+  exterior night. Each shows its scene number, set, time of day, length in
+  eighths and cast numbers.
+- **Build the shoot by dragging.** Drag scenes from Unscheduled onto the
+  board and into order, drop in end-of-day breaks, and give each day a date
+  and a note. Every day totals its scenes and pages. Arrow buttons do the
+  same on a phone or from the keyboard.
+- **Strips follow the script.** Rewrite a heading from DAY to NIGHT and its
+  strip keeps its place; cut the scene and the strip is flagged.
 
 ### Working with someone on another machine
 

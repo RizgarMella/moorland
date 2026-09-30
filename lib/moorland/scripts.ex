@@ -26,7 +26,9 @@ defmodule Moorland.Scripts do
     Notification,
     Activity,
     Breakdown,
-    BreakdownTag
+    BreakdownTag,
+    Schedule,
+    ScheduleItem
   }
 
   @auto_snapshot_interval_seconds 10 * 60
@@ -686,6 +688,175 @@ defmodule Moorland.Scripts do
       end
     end
   end
+
+  ## Schedule (stripboard)
+  #
+  # Changing the schedule needs edit rights: it is one shared board, and
+  # reordering it rewrites everyone's view of the shoot.
+
+  def list_schedule_items(%Script{} = script) do
+    from(i in ScheduleItem,
+      where: i.script_id == ^script.id,
+      order_by: [asc: i.position, asc: i.id]
+    )
+    |> Repo.all()
+  end
+
+  @doc "Puts a scene's strip at the end of the board."
+  def schedule_scene(%Scope{} = scope, %Script{} = script, %{} = attrs) do
+    with :ok <- authorize(scope, script, :edit) do
+      %ScheduleItem{script_id: script.id}
+      |> ScheduleItem.scene_changeset(%{
+        heading: attrs[:heading] || attrs["heading"],
+        line_no: parse_line(attrs[:line_no] || attrs["line_no"]),
+        position: next_position(script)
+      })
+      |> Repo.insert()
+      |> tap_schedule(script)
+    end
+  end
+
+  @doc "Appends every scene not yet on the board, in script order."
+  def schedule_remaining(%Scope{} = scope, %Script{} = script) do
+    with :ok <- authorize(scope, script, :edit) do
+      board =
+        Schedule.build(script.content, list_breakdown_tags(script), list_schedule_items(script))
+
+      start = next_position(script)
+      now = DateTime.utc_now(:second)
+
+      rows =
+        board.unscheduled
+        |> Enum.with_index(start)
+        |> Enum.map(fn {scene, position} ->
+          %{
+            script_id: script.id,
+            kind: "scene",
+            heading: String.slice(scene.heading, 0, 200),
+            line_no: scene.line,
+            position: position,
+            uid: Ecto.UUID.generate(),
+            inserted_at: now,
+            updated_at: now
+          }
+        end)
+
+      {count, _} = Repo.insert_all(ScheduleItem, rows)
+      if count > 0, do: broadcast(script.id, {:schedule_changed, script.id})
+      {:ok, count}
+    end
+  end
+
+  @doc "Adds an end-of-day break at the end of the board."
+  def add_day_break(%Scope{} = scope, %Script{} = script, attrs \\ %{}) do
+    with :ok <- authorize(scope, script, :edit) do
+      %ScheduleItem{script_id: script.id}
+      |> ScheduleItem.day_changeset(Map.put(stringify(attrs), "position", next_position(script)))
+      |> Repo.insert()
+      |> tap_schedule(script)
+    end
+  end
+
+  @doc "Sets a day break's shoot date and note."
+  def update_day_break(%Scope{} = scope, %Script{} = script, item_id, attrs) do
+    with :ok <- authorize(scope, script, :edit),
+         %ScheduleItem{kind: "day"} = item <- get_schedule_item(script, item_id) do
+      item
+      |> ScheduleItem.day_changeset(Map.take(stringify(attrs), ["shoot_date", "note"]))
+      |> Repo.update()
+      |> tap_schedule(script)
+    else
+      nil -> {:error, :not_found}
+      %ScheduleItem{} -> {:error, :not_found}
+      error -> error
+    end
+  end
+
+  @doc "Takes a strip or day break off the board."
+  def remove_schedule_item(%Scope{} = scope, %Script{} = script, item_id) do
+    with :ok <- authorize(scope, script, :edit),
+         %ScheduleItem{} = item <- get_schedule_item(script, item_id) do
+      Repo.delete(item)
+      broadcast(script.id, {:schedule_changed, script.id})
+      :ok
+    else
+      nil -> {:error, :not_found}
+      error -> error
+    end
+  end
+
+  @doc """
+  Lays the board out in the given order. Each entry is an existing item's
+  id, or `%{"heading" => ..., "line_no" => ...}` for a scene dragged on
+  from the unscheduled list. Items left out keep their place after the
+  listed ones, so a stale client cannot drop anything.
+  """
+  def reorder_schedule(%Scope{} = scope, %Script{} = script, entries) when is_list(entries) do
+    with :ok <- authorize(scope, script, :edit) do
+      existing = list_schedule_items(script)
+      by_id = Map.new(existing, &{to_string(&1.id), &1})
+
+      listed =
+        entries
+        |> Enum.map(fn
+          %{"heading" => heading} = entry when is_binary(heading) ->
+            {:new, String.slice(heading, 0, 200), parse_line(entry["line_no"])}
+
+          id ->
+            Map.get(by_id, to_string(id))
+        end)
+        |> Enum.reject(&is_nil/1)
+        |> Enum.uniq()
+
+      listed_ids = for %ScheduleItem{id: id} <- listed, into: MapSet.new(), do: id
+      rest = Enum.reject(existing, &MapSet.member?(listed_ids, &1.id))
+
+      Repo.transaction(fn ->
+        (listed ++ rest)
+        |> Enum.with_index()
+        |> Enum.each(fn
+          {{:new, heading, line}, position} ->
+            %ScheduleItem{script_id: script.id}
+            |> ScheduleItem.scene_changeset(%{
+              heading: heading,
+              line_no: line,
+              position: position
+            })
+            |> Repo.insert!()
+
+          {%ScheduleItem{position: position}, position} ->
+            :ok
+
+          {%ScheduleItem{} = item, position} ->
+            item |> Ecto.Changeset.change(position: position) |> Repo.update!()
+        end)
+      end)
+
+      broadcast(script.id, {:schedule_changed, script.id})
+      :ok
+    end
+  end
+
+  defp get_schedule_item(script, id) do
+    case Repo.get(ScheduleItem, id) do
+      %ScheduleItem{script_id: sid} = item when sid == script.id -> item
+      _ -> nil
+    end
+  end
+
+  defp next_position(script) do
+    (Repo.one(from(i in ScheduleItem, where: i.script_id == ^script.id, select: max(i.position))) ||
+       -1) + 1
+  end
+
+  defp tap_schedule({:ok, _} = result, script) do
+    broadcast(script.id, {:schedule_changed, script.id})
+    result
+  end
+
+  defp tap_schedule(result, _script), do: result
+
+  defp stringify(attrs), do: Map.new(attrs, fn {k, v} -> {to_string(k), v} end)
 
   defp parse_line(n) when is_integer(n) and n >= 0, do: n
 

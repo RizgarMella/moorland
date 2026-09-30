@@ -68,6 +68,7 @@ defmodule MoorlandWeb.Router do
       live "/scripts", ScriptLive.Index, :index
       live "/scripts/:id", ScriptLive.Editor, :edit
       live "/scripts/:id/breakdown", ScriptLive.Breakdown, :show
+      live "/scripts/:id/schedule", ScriptLive.Schedule, :show
       live "/peers", PeerLive.Index, :index
       live "/contacts", ContactLive.Index, :index
     end

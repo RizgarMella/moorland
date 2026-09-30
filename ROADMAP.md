@@ -147,6 +147,14 @@ it wrote; the origin's owner can delete anything and the next pull follows.
 - **Stripboard / shooting schedule** [production] — scenes as colored strips
   (INT/EXT, day/night, page-eighths from the pagination model) dragged into
   shoot days; grows out of the scene navigator's drag-reorder.
+  *Shipped (Sep 30 2026):* `/scripts/:id/schedule`. One ordered list of
+  `ScheduleItem`s per script (scene strips and end-of-day breaks with date
+  and note); `Scripts.Schedule` matches strips to scenes by heading nearest
+  the remembered line, then by location, so a DAY→NIGHT rewrite keeps its
+  strip; cast numbered by size of part; day totals in eighths. Drag and
+  drop from Unscheduled and within the board, arrows for touch and
+  keyboard; edit rights to change it. Left: peer sync of the board, and
+  day-out-of-days and call sheets, which read straight off it.
 - **Shot lists & storyboards** [production] — per-scene shot tables created by
   highlighting a script line; storyboard images and mood boards stored in the
   data folder.

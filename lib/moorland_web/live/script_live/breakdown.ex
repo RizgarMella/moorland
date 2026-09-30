@@ -162,8 +162,8 @@ defmodule MoorlandWeb.ScriptLive.Breakdown do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <div class="mx-auto max-w-5xl py-8 print:max-w-none print:py-0">
+    <Layouts.app flash={@flash} current_scope={@current_scope} wide>
+      <div class="py-2 print:py-0">
         <div class="flex flex-wrap items-center gap-3 print:hidden">
           <.link
             navigate={~p"/scripts/#{@script.id}"}
@@ -176,13 +176,21 @@ defmodule MoorlandWeb.ScriptLive.Breakdown do
             <h1 class="text-2xl font-semibold tracking-tight">Breakdown</h1>
             <p class="mt-0.5 truncate text-sm text-base-content/60">{@script.title}</p>
           </div>
+          <.link
+            id="open-schedule"
+            navigate={~p"/scripts/#{@script.id}/schedule"}
+            class="btn btn-ghost btn-sm"
+            title="Stripboard"
+          >
+            <.icon name="hero-calendar-days" class="size-4" /><span class="hidden sm:inline">Stripboard</span>
+          </.link>
           <a
             id="breakdown-csv"
             href={~p"/scripts/#{@script.id}/breakdown.csv"}
             class="btn btn-ghost btn-sm"
             title="Download as a spreadsheet (CSV)"
           >
-            <.icon name="hero-table-cells" class="size-4" /> CSV
+            <.icon name="hero-table-cells" class="size-4" /><span class="hidden sm:inline">CSV</span>
           </a>
           <button
             id="breakdown-print"
@@ -191,7 +199,7 @@ defmodule MoorlandWeb.ScriptLive.Breakdown do
             class="btn btn-ghost btn-sm"
             title="Print or save as PDF"
           >
-            <.icon name="hero-printer" class="size-4" /> Print
+            <.icon name="hero-printer" class="size-4" /><span class="hidden sm:inline">Print</span>
           </button>
         </div>
 

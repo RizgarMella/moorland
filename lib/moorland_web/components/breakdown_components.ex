@@ -38,6 +38,7 @@ defmodule MoorlandWeb.BreakdownComponents do
     end
   end
 
+  def eighths(0), do: "0"
   def eighths(_n), do: "—"
 
   def int_ext_label(:int), do: "INT"
@@ -61,13 +62,22 @@ defmodule MoorlandWeb.BreakdownComponents do
     <div id="breakdown-panel" class="flex flex-1 flex-col">
       <div class="flex items-center justify-between border-b border-base-300 px-4 py-3">
         <h2 class="text-sm font-semibold">Breakdown</h2>
-        <.link
-          id="open-breakdown"
-          navigate={~p"/scripts/#{@script.id}/breakdown"}
-          class="flex items-center gap-1 text-xs text-base-content/60 transition hover:text-base-content"
-        >
-          All scenes <.icon name="hero-arrow-top-right-on-square" class="size-3.5" />
-        </.link>
+        <div class="flex items-center gap-3">
+          <.link
+            id="open-schedule"
+            navigate={~p"/scripts/#{@script.id}/schedule"}
+            class="flex items-center gap-1 text-xs text-base-content/60 transition hover:text-base-content"
+          >
+            Stripboard
+          </.link>
+          <.link
+            id="open-breakdown"
+            navigate={~p"/scripts/#{@script.id}/breakdown"}
+            class="flex items-center gap-1 text-xs text-base-content/60 transition hover:text-base-content"
+          >
+            All scenes <.icon name="hero-arrow-top-right-on-square" class="size-3.5" />
+          </.link>
+        </div>
       </div>
 
       <form

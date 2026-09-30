@@ -811,6 +811,47 @@ input:checked + .bd-pick {
   }
 }
 
+/* ---- Stripboard ----------------------------------------------------------- */
+
+/* Paper stripboard colours: white INT day, yellow EXT day, blue INT night,
+   green EXT night. A strong band on the left edge carries the colour when
+   the fill is pale. */
+.strip {
+  border-left-width: 6px;
+  color: #111827;
+  transition: box-shadow 120ms ease, opacity 120ms ease;
+}
+
+.strip:hover {
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+}
+
+.strip-int-day { background: #ffffff; border-color: #d1d5db; border-left-color: #9ca3af; }
+.strip-ext-day { background: #fef3c7; border-color: #fde68a; border-left-color: #f59e0b; }
+.strip-int-night { background: #dbeafe; border-color: #bfdbfe; border-left-color: #3b82f6; }
+.strip-ext-night { background: #dcfce7; border-color: #bbf7d0; border-left-color: #22c55e; }
+.strip-other { background: #f3f4f6; border-color: #e5e7eb; border-left-color: #6b7280; }
+
+[data-theme=dark] .strip { color: #e5e7eb; }
+[data-theme=dark] .strip-int-day { background: #1f2937; border-color: #374151; border-left-color: #d1d5db; }
+[data-theme=dark] .strip-ext-day { background: color-mix(in srgb, #f59e0b 18%, #111827); border-color: #78350f; border-left-color: #fbbf24; }
+[data-theme=dark] .strip-int-night { background: color-mix(in srgb, #3b82f6 20%, #111827); border-color: #1e3a8a; border-left-color: #60a5fa; }
+[data-theme=dark] .strip-ext-night { background: color-mix(in srgb, #22c55e 16%, #111827); border-color: #14532d; border-left-color: #4ade80; }
+[data-theme=dark] .strip-other { background: #1f2937; border-color: #374151; border-left-color: #9ca3af; }
+
+.strip-dragging {
+  opacity: 0.45;
+}
+
+@media print {
+  .strip,
+  #board .bg-neutral {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+    break-inside: avoid;
+  }
+}
+
 /* ---- Print / PDF ---------------------------------------------------------- */
 
 .print-screenplay {
