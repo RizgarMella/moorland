@@ -88,6 +88,12 @@ defmodule Moorland.BreakdownContextTest do
     assert Scripts.list_breakdown_tags(s) == []
   end
 
+  test "ids that are not ids are not found", %{owner: owner, script: s} do
+    assert {:error, :not_allowed} = Scripts.delete_breakdown_tag(owner, s, "abc")
+    assert {:error, :not_found} = Scripts.remove_schedule_item(owner, s, "1; drop")
+    assert {:error, :not_found} = Scripts.update_day_break(owner, s, nil, %{"note" => "x"})
+  end
+
   test "tags from another script cannot be deleted through this one", %{owner: owner, script: s} do
     {:ok, elsewhere} = Scripts.create_script(owner, %{title: "Other"})
 

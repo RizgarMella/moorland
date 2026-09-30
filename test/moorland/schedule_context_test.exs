@@ -61,7 +61,11 @@ defmodule Moorland.ScheduleContextTest do
         to_string(b.id),
         %{"heading" => "INT. ATTIC - DAY", "line_no" => 8},
         d.id,
-        "999999"
+        "999999",
+        %{"heading" => 5},
+        %{"heading" => ""},
+        [1, 2],
+        nil
       ])
 
     assert kinds(s) == ["EXT. GARDEN - NIGHT", "INT. ATTIC - DAY", "DAY", "INT. KITCHEN - DAY"]

@@ -646,7 +646,7 @@ defmodule Moorland.Scripts do
   @doc "Removes one tag. Its author, or anyone who may edit the script, may."
   def delete_breakdown_tag(%Scope{user: user} = scope, %Script{} = script, tag_id) do
     with %BreakdownTag{script_id: sid} = tag when sid == script.id <-
-           Repo.get(BreakdownTag, tag_id),
+           get_by_id(BreakdownTag, tag_id),
          true <- tag.author_id == user.id or can_edit?(role(scope, script)) do
       Activity.remember_deletion(script, "breakdown_tag", tag)
       Repo.delete(tag)
@@ -808,11 +808,14 @@ defmodule Moorland.Scripts do
       listed =
         entries
         |> Enum.map(fn
-          %{"heading" => heading} = entry when is_binary(heading) ->
+          %{"heading" => heading} = entry when is_binary(heading) and heading != "" ->
             {:new, String.slice(heading, 0, 200), parse_line(entry["line_no"])}
 
-          id ->
+          id when is_binary(id) or is_integer(id) ->
             Map.get(by_id, to_string(id))
+
+          _other ->
+            nil
         end)
         |> Enum.reject(&is_nil/1)
         |> Enum.uniq()
@@ -847,7 +850,7 @@ defmodule Moorland.Scripts do
   end
 
   defp get_schedule_item(script, id) do
-    case Repo.get(ScheduleItem, id) do
+    case get_by_id(ScheduleItem, id) do
       %ScheduleItem{script_id: sid} = item when sid == script.id -> item
       _ -> nil
     end
@@ -876,6 +879,19 @@ defmodule Moorland.Scripts do
   end
 
   defp stringify(attrs), do: Map.new(attrs, fn {k, v} -> {to_string(k), v} end)
+
+  # Ids arrive from the browser as strings; anything that isn't one is simply
+  # not found, rather than a crash.
+  defp get_by_id(schema, id) when is_integer(id), do: Repo.get(schema, id)
+
+  defp get_by_id(schema, id) when is_binary(id) do
+    case Integer.parse(id) do
+      {int, ""} -> Repo.get(schema, int)
+      _ -> nil
+    end
+  end
+
+  defp get_by_id(_schema, _id), do: nil
 
   defp parse_line(n) when is_integer(n) and n >= 0, do: n
 
