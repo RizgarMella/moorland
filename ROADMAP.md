@@ -11,19 +11,20 @@ Phase one delivered installation identity (Ed25519 keypair + `moor:` peer codes)
 signed peer-to-peer HTTP sync, per-script sharing (editor/viewer), and mirrored
 scripts that three-way merge through the same engine as same-server co-editing.
 
-Known limitations, each mapped to the phase that removes it:
+Known limitations of phase one, each mapped to the phase that removes it, and
+where each stands now:
 
-| # | Limitation | Removed in |
-|---|------------|-----------|
-| 1 | Reachability: peers connect only where the address is directly reachable (LAN, VPN, forwarded port) — no NAT traversal | Phase 3 |
-| 2 | Discovery is manual: both sides must paste each other's codes | Phase 3 (mDNS on LAN, studio introductions beyond it) |
-| 3 | Transport is signed but **not encrypted** — safe on LAN/VPN, not for the open internet | Phase 2 |
-| 4 | Content-only sync: comments, notes, and version history stay on each machine | Phase 2 |
-| 5 | Poll-based (~10 s) propagation between installs, not keystroke-live | Phase 2 |
-| 6 | The origin machine is the authority and must be online for its scripts to sync — no third copy holds them | Phase 2 (studio backup) |
-| 7 | If a save's base version falls out of the origin's cache (~200 versions), that save degrades to last-write-wins | Phase 2 (persist merge bases) |
-| 8 | Mirrors attach to whichever local user added the peer; peer trust is per-installation, not per-user | Phase 2 |
-| 9 | Runs as a dev server started by hand; nothing claims a `.local` name or updates itself | Phase 4 |
+| # | Limitation | Removed in | Status |
+|---|------------|-----------|--------|
+| 1 | Reachability: peers connect only where the address is directly reachable (LAN, VPN, forwarded port) — no NAT traversal | Phase 3 | Open |
+| 2 | Discovery is manual: both sides must paste each other's codes | Phase 3 (mDNS on LAN, studio introductions beyond it) | Partly: LAN beacon shipped Sep 1 2026; beyond the LAN still open |
+| 3 | Transport is signed but **not encrypted** — safe on LAN/VPN, not for the open internet | Phase 2 | Closed Sep 6 2026 |
+| 4 | Content-only sync: comments, notes, and version history stay on each machine | Phase 2 | Closed Sep 6 2026 |
+| 5 | Poll-based (~10 s) propagation between installs, not keystroke-live | Phase 2 | Closed Sep 1 2026 (push notify) |
+| 6 | The origin machine is the authority and must be online for its scripts to sync — no third copy holds them | Phase 2 (studio backup) | Open |
+| 7 | If a save's base version falls out of the origin's cache (~200 versions), that save degrades to last-write-wins | Phase 2 (persist merge bases) | Closed Aug 31 2026 |
+| 8 | Mirrors attach to whichever local user added the peer; peer trust is per-installation, not per-user | Phase 2 | Closed Sep 1 2026 |
+| 9 | Runs as a dev server started by hand; nothing claims a `.local` name or updates itself | Phase 4 | Partly: one-file builds shipped Sep 6 2026; `.local` name and install-on-restart still open |
 
 ## The road to the last phase
 
