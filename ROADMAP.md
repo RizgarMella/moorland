@@ -2,7 +2,8 @@
 
 Principle: **one piece of software, distributed, no centralisation unless you want it.**
 Every install is identical; roles (writer, peer, studio) are configuration, not products.
-AI features are deliberately excluded from this roadmap — there is a separate plan for those.
+AI stays outside the core: the only AI item here is the peer-shaped hook for
+an external assistant (Directions, [ai]); the assistant itself has a separate plan.
 
 ## Where we are: phase one (shipped) and its limitations
 
@@ -61,8 +62,10 @@ shot lists, contacts, and calendars are independent.
 
 Everything not yet built, ordered by expected effort. Tags: [editor],
 [peer] (phase 2–3 architecture), [production] (StudioBinder-class),
-[packaging]. Sources of each set: user requests, Highland Pro parity
-research, StudioBinder research (both Aug 2026).
+[packaging], and for the unsized Directions at the end: [prose], [ai],
+[formats], [pipeline]. Sources of each set: user requests, Highland Pro
+parity research, StudioBinder research (both Aug 2026), owner directions
+(Sep 2026).
 
 ## Tier 1 — Small — ALL SHIPPED (Aug 31 2026)
 
@@ -122,7 +125,8 @@ it wrote; the origin's owner can delete anything and the next pull follows.
   color with margin marks, steppable revision sets. Later feeds production's
   locked pages and colored draft revisions.
 - **More document types & templates** [editor] — treatment, stage play,
-  multi-cam, comic book, prose/novel (Markdown) with matching PDF layouts.
+  multi-cam, comic book, prose/novel (Markdown) with matching PDF layouts
+  (prose/novel now developed under Directions below).
 - **Production drafts** [production] — locked pages, colored revision drafts,
   scene numbers frozen for the shoot (builds on Revision mode).
 - **Script breakdown** [production] — tag scene elements (cast, props,
@@ -166,6 +170,97 @@ it wrote; the origin's owner can delete anything and the next pull follows.
   holepunching (libp2p-inspired; `ex_webrtc` a candidate) with studios as
   rendezvous and relay fallback, so any two writers on the internet can link
   with only their codes.
+
+## Directions — unsized
+
+Owner directions from Sep 2026, not yet estimated or tiered: the place where
+half-formed product ideas are recorded and developed until they are shaped
+enough to join a tier. Each names what it builds on, the smallest step that
+ships, and what is still open.
+
+- **Idea sketch zone** [editor] — a place in the app for ideas that are not
+  yet a script: half-formed premises, characters, scraps of dialogue,
+  developed over time. Builds on per-script Notes (`Scripts.Note`: colour,
+  pinned, peer-synced through `Scripts.Activity`), the private cross-script
+  Shelf (`Scripts.Snippet`), and inline `[[notes]]` in the navigator.
+  *First step:* a `kind` on Note (`note` | `sketch`), a Sketches tab in the
+  Notes pane, and "Start a script from this sketch" calling
+  `Scripts.create_script`; sync is free once `kind` rides in the note
+  payload. *Open:* sketches before any script exists need a home above
+  scripts (a project, see the pipeline, or a nullable `script_id`); whether
+  the Shelf folds into this.
+- **Short stories and books** [prose] — prose as a first-class document;
+  supersedes the prose/novel clause of "More document types" in Tier 3.
+  Builds on `goal_words`, sprints, Markdown export in `fountain.js`, the
+  section-aware navigator, and the `.fountain` data-folder mirror
+  (`Moorland.Storage`). *First step:* a `kind` column on Script
+  (`screenplay` | `prose`); in prose the editor skips `smart_format.js` and
+  cue autocomplete, the preview renders Markdown, the navigator lists `#`
+  and `##` headings as chapters and scenes, and the mirror is written as
+  `.md`. *Open:* one document per book or one per chapter; which manuscript
+  standard the PDF follows. Research (Sep 2026) into what prose needs that
+  the screenplay editor lacks, with the cost of each:
+
+  | Feature | Cost |
+  |---|---|
+  | `kind` column on Script, default `screenplay` | small |
+  | Prose editor mode: no smart formatting or cue autocomplete, soft paragraphs, `*italic*` | medium |
+  | Chapter and scene navigator from headings | reuses existing |
+  | Word-count goals, sprints, live counts | reuses existing |
+  | Front matter (title, author, contact, word count) via the title page form | reuses existing |
+  | `.md` chapter files in the data-folder mirror | small |
+  | Standard manuscript PDF (12pt, double-spaced, header slug) | small, a print stylesheet |
+  | DOCX export, hand-rolled OOXML through Erlang `:zip`, no dependency | medium |
+  | EPUB export (zip of XHTML plus OPF) | medium |
+  | Style checks: repeated words, adverbs, passive voice, dialogue-tag counts (JS, like `typoSuggestions`) | small |
+  | Reading time and chapter-length report | small |
+  | Comments, notes, history, peer sync, offline | reuses existing |
+  | Index cards per chapter or scene | medium |
+
+- **AI collaborator as a peer** [ai] — an assistant that comments, checks
+  consistency and proposes edits, connected exactly like a peer
+  installation, so no AI runs inside Moorland. The assistant is a headless
+  peer: its own Ed25519 identity and `moor:` code, speaking the existing
+  sealed envelope (`hello`, `shared`, `fetch`, `activity`, `activity_push`,
+  `save`, `notify`) against `PeerApiController`; the writer adds it on the
+  Peers page and shares a script with it. Core changes, all small: (1) a
+  `commenter` peer role (`PeerShare` allows `editor` and `viewer` only), with
+  `Scripts.peer_apply_activity` accepting comments and notes from commenters
+  while `peer_save` stays editor-only; (2) an `assistant` flag on
+  `Peers.Peer`, so its comments and notes carry a badge and never trigger
+  mention email; (3) optionally a `suggestion` activity kind, a Version-like
+  record (proposed content plus a message) listed in History with Apply
+  (the existing three-way merge) or Dismiss, so a commenter assistant can
+  propose edits without write access. With the editor role it simply saves
+  and merges like any peer. Consistency findings are ordinary anchored
+  comments (`line_no`, `anchor_text`, `remote_author`). Outside the app: the
+  assistant runtime, model choice, keys, prompts, and its own release, which
+  is the separate plan. *First step:* the commenter role and the assistant
+  badge, verified with a test that plays the peer. *Open:* size and rate
+  limits on assistant pushes; whether "may propose edits" is a per-share
+  toggle; suggestion records versus plain editor saves.
+- **Podcast and educational scripts** [formats] — podcast episodes (hosts,
+  segments, ad breaks, timings) and lesson scripts (objectives, narration,
+  on-screen text). Builds on the Fountain parser (sections, synopses,
+  character cues), the runtime and speaking-part reports, sides export, and
+  the Tier 3 templates item. *First step:* `kind: podcast` as a Fountain
+  flavour: a template, cues as hosts, sections as segments, runtime from
+  words at speech rate, and one PDF layout. *Open:* whether educational
+  scripts need a two-column audio/visual layout of their own; whether
+  formats share one `kind` field with prose.
+- **Story-to-script pipeline** [pipeline] — one project carries a work from
+  idea to short story to fleshed-out story to script, with collaborators,
+  enterable at any stage (drop a whole story in), and with Moorland helping
+  build character specs. Builds on the sketch zone, the prose kind,
+  Fountain/txt import, Bin & Shelf, `harvestCharacters`, gender tags on
+  speaking parts, and peer sharing. *First step:* `stage` and
+  `parent_script_id` on Script, a Stages strip in the editor, and "Start the
+  next stage from this", which creates the next document prefilled (prose
+  headings become scene stubs). Character specs: a Characters panel seeded
+  from `harvestCharacters` plus a proper-noun pass over prose, each sheet
+  stored as a `character` Note so it syncs to peers. *Open:* lineage fields
+  versus a first-class Project schema; whether a peer share covers the whole
+  lineage; where the AI peer hooks in to check consistency across stages.
 
 ---
 

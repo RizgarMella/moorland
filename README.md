@@ -167,8 +167,10 @@ Studio mode, so any installation can also back up and introduce a circle of
 writers. Connecting across the internet with nothing more than two peer
 codes. One file installers for every platform. Then pre-production: script
 breakdowns, stripboards and shooting schedules, shot lists, day out of days
-and call sheets, distributed through the same peer circle. Details and
-current status are in [ROADMAP.md](ROADMAP.md).
+and call sheets, distributed through the same peer circle. Beyond that:
+prose and new script formats, an idea-to-script pipeline, and an external
+AI assistant that joins as a peer. Details and current status are in
+[ROADMAP.md](ROADMAP.md).
 
 ## For developers
 
