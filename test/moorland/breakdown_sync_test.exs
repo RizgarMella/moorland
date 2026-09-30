@@ -76,6 +76,22 @@ defmodule Moorland.BreakdownSyncTest do
     %{alice: alice, bob: bob, origin: origin, mirror: mirror, peer: peer}
   end
 
+  test "sketches travel as notes and stay sketches", ctx do
+    {:ok, _} = Scripts.create_note(ctx.alice, ctx.origin, %{body: "A premise", kind: "sketch"})
+    pull(ctx.mirror, ctx.origin)
+    assert [%{kind: "sketch"}] = Scripts.list_notes(ctx.mirror)
+
+    # A peer from before sketches sends notes without a kind.
+    {:ok, data} = Scripts.peer_activity(peer_key(), ctx.origin.id, 0)
+    data = wire(data)
+    data = %{data | "notes" => Enum.map(data["notes"], &Map.delete(&1, "kind")), "stamp" => "x"}
+
+    {:ok, _} =
+      Activity.apply_from_origin(Moorland.Repo.get!(Moorland.Scripts.Script, ctx.mirror.id), data)
+
+    assert [%{kind: "sketch"}] = Scripts.list_notes(ctx.mirror)
+  end
+
   test "the origin's tags arrive on the mirror under the author's handle", ctx do
     tag(ctx.alice, ctx.origin, "Brass lamp", "brass lamp")
     pull(ctx.mirror, ctx.origin)

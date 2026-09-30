@@ -533,6 +533,7 @@ defmodule Moorland.Scripts.Activity do
         body: body,
         color: color(item["color"]),
         pinned: item["pinned"] == true,
+        kind: if(item["kind"] in Note.kinds(), do: item["kind"], else: "note"),
         remote_author: handle_from(item),
         peer_key: peer_key,
         inserted_at: parse_time(item["inserted_at"])
@@ -550,7 +551,9 @@ defmodule Moorland.Scripts.Activity do
     fields = [
       body: clip(item["body"], @max_body),
       color: color(item["color"]),
-      pinned: item["pinned"] == true
+      pinned: item["pinned"] == true,
+      # A peer from before sketches sends no kind; keep what the note is.
+      kind: if(item["kind"] in Note.kinds(), do: item["kind"], else: existing.kind)
     ]
 
     if fields[:body] == "" or Enum.all?(fields, fn {k, v} -> Map.get(existing, k) == v end) do
@@ -756,6 +759,7 @@ defmodule Moorland.Scripts.Activity do
       body: n.body,
       color: n.color,
       pinned: n.pinned,
+      kind: n.kind,
       author: handle(n),
       inserted_at: iso(n.inserted_at)
     }

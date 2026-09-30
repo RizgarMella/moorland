@@ -954,6 +954,30 @@ defmodule Moorland.Scripts do
 
   defp parse_line(_n), do: 0
 
+  @doc """
+  Starts a new script from a sketch: titled with the sketch's first line,
+  with the whole sketch kept in the new script's boneyard, where it can be
+  seen while writing but never prints. The caller becomes its owner.
+  """
+  def start_script_from_sketch(%Scope{} = scope, %Script{} = script, note_id) do
+    with :ok <- authorize(scope, script, :view),
+         %Note{script_id: sid, kind: "sketch"} = note when sid == script.id <-
+           get_by_id(Note, note_id) do
+      title =
+        note.body
+        |> String.split("\n", trim: true)
+        |> List.first("Untitled")
+        |> String.trim()
+        |> String.slice(0, 80)
+
+      # "*/" inside the sketch would close the boneyard early.
+      kept = String.replace(note.body, "*/", "* /")
+      create_script(scope, %{title: title, content: "/*\nFrom a sketch:\n\n#{kept}\n*/\n\n"})
+    else
+      _ -> {:error, :not_found}
+    end
+  end
+
   ## Peer sharing (origin side: this installation owns the script)
 
   @doc "Map of peer_id => role for a script's peer shares."

@@ -48,6 +48,9 @@ middle. It is free software built on an open format.
 - **Goals and sprints.** Set word or page goals and watch the progress bar.
   Run a timed writing sprint with a live word count.
 - **Lookup.** Definitions, synonyms and rhymes without leaving the editor.
+- **Sketches.** Keep premises, characters and scraps that aren't a script
+  yet on the Sketches tab of Notes, and start a new script from one when
+  it's ready.
 - **Bin and Shelf.** Text you cut goes to the script's Bin. Text you want to
   keep across scripts goes to your private Shelf. Nothing is ever lost.
 - **Offline first.** Keep writing without a connection. Your work merges

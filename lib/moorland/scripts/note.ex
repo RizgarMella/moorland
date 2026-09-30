@@ -3,11 +3,13 @@ defmodule Moorland.Scripts.Note do
   import Ecto.Changeset
 
   @colors ~w(yellow blue green pink gray)
+  @kinds ~w(note sketch)
 
   schema "notes" do
     field :body, :string
     field :color, :string, default: "yellow"
     field :pinned, :boolean, default: false
+    field :kind, :string, default: "note"
 
     # Peer sync (see Comment).
     field :uid, :string, autogenerate: {Ecto.UUID, :generate, []}
@@ -23,12 +25,14 @@ defmodule Moorland.Scripts.Note do
   end
 
   def colors, do: @colors
+  def kinds, do: @kinds
 
   def changeset(note, attrs) do
     note
-    |> cast(attrs, [:body, :color, :pinned])
+    |> cast(attrs, [:body, :color, :pinned, :kind])
     |> validate_required([:body])
     |> validate_inclusion(:color, @colors)
+    |> validate_inclusion(:kind, @kinds)
     |> validate_length(:body, max: 5000)
   end
 end

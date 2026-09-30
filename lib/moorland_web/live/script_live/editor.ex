@@ -44,6 +44,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
         lookup_result: nil,
         tag_draft: nil,
         breakdown: nil,
+        notes_kind: "note",
         tags: Scripts.list_breakdown_tags(script),
         revision_sets: Scripts.list_revision_sets(script),
         revision_shown: nil,
@@ -449,12 +450,32 @@ defmodule MoorlandWeb.ScriptLive.Editor do
 
   ## Notes
 
-  def handle_event("add_note", %{"body" => body, "color" => color}, socket) do
+  def handle_event("add_note", %{"body" => body, "color" => color} = params, socket) do
     %{current_scope: scope, script: script} = socket.assigns
+    kind = if params["kind"] == "sketch", do: "sketch", else: "note"
 
-    case Scripts.create_note(scope, script, %{body: body, color: color}) do
+    case Scripts.create_note(scope, script, %{body: body, color: color, kind: kind}) do
       {:ok, _} -> {:noreply, load_panel_data(socket)}
       {:error, _} -> {:noreply, put_flash(socket, :error, "Could not add the note.")}
+    end
+  end
+
+  def handle_event("notes_kind", %{"kind" => kind}, socket) do
+    {:noreply, assign(socket, :notes_kind, if(kind == "sketch", do: "sketch", else: "note"))}
+  end
+
+  def handle_event("script_from_sketch", %{"id" => id}, socket) do
+    %{current_scope: scope, script: script} = socket.assigns
+
+    case Scripts.start_script_from_sketch(scope, script, id) do
+      {:ok, new_script} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "New script started from the sketch.")
+         |> push_navigate(to: ~p"/scripts/#{new_script.id}")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Could not start a script from that sketch.")}
     end
   end
 
@@ -1067,7 +1088,9 @@ defmodule MoorlandWeb.ScriptLive.Editor do
           />
           <.notes_panel
             :if={@panel == "notes"}
-            notes={@notes}
+            notes={Enum.filter(@notes, &(&1.kind == @notes_kind))}
+            kind={@notes_kind}
+            counts={Enum.frequencies_by(@notes, & &1.kind)}
             role={@role}
             current_user_id={@current_scope.user.id}
           />
@@ -1269,14 +1292,37 @@ defmodule MoorlandWeb.ScriptLive.Editor do
   end
 
   attr :notes, :list, required: true
+  attr :kind, :string, required: true
+  attr :counts, :map, required: true
   attr :role, :atom, required: true
   attr :current_user_id, :integer, required: true
 
   defp notes_panel(assigns) do
     ~H"""
     <div class="flex flex-col">
-      <div class="border-b border-base-300 px-4 py-3">
+      <div class="flex items-center justify-between gap-2 border-b border-base-300 px-4 py-3">
         <h2 class="text-sm font-semibold">Notes</h2>
+        <div class="flex items-center gap-0.5 rounded-lg bg-base-200 p-0.5" role="tablist">
+          <button
+            :for={{kind, label} <- [{"note", "Notes"}, {"sketch", "Sketches"}]}
+            id={"notes-tab-#{kind}"}
+            type="button"
+            role="tab"
+            aria-selected={to_string(@kind == kind)}
+            phx-click="notes_kind"
+            phx-value-kind={kind}
+            class={[
+              "rounded-md px-2 py-0.5 text-[11px] font-medium transition",
+              @kind == kind && "bg-base-100 shadow-sm",
+              @kind != kind && "text-base-content/60 hover:text-base-content"
+            ]}
+          >
+            {label}
+            <span :if={@counts[kind]} class="ml-0.5 tabular-nums text-base-content/40">
+              {@counts[kind]}
+            </span>
+          </button>
+        </div>
       </div>
 
       <form
@@ -1285,11 +1331,16 @@ defmodule MoorlandWeb.ScriptLive.Editor do
         phx-submit="add_note"
         class="border-b border-base-300 px-4 py-3"
       >
+        <input type="hidden" name="kind" value={@kind} />
         <textarea
           name="body"
-          rows="2"
+          rows={if @kind == "sketch", do: "4", else: "2"}
           required
-          placeholder="Story ideas, research, reminders…"
+          placeholder={
+            if @kind == "sketch",
+              do: "A premise, a character, a scrap of dialogue… The first line becomes its title.",
+              else: "Story ideas, research, reminders…"
+          }
           class="textarea textarea-bordered w-full text-sm"
         ></textarea>
         <div class="mt-2 flex items-center justify-between">
@@ -1308,7 +1359,9 @@ defmodule MoorlandWeb.ScriptLive.Editor do
               ]}></span>
             </label>
           </div>
-          <button type="submit" class="btn btn-neutral btn-xs">Add note</button>
+          <button type="submit" class="btn btn-neutral btn-xs">
+            {if @kind == "sketch", do: "Add sketch", else: "Add note"}
+          </button>
         </div>
       </form>
 
@@ -1349,10 +1402,22 @@ defmodule MoorlandWeb.ScriptLive.Editor do
             </div>
           </div>
           <p class="mt-1.5 whitespace-pre-wrap text-sm">{note.body}</p>
+          <button
+            :if={note.kind == "sketch"}
+            type="button"
+            phx-click="script_from_sketch"
+            phx-value-id={note.id}
+            class="mt-2 flex items-center gap-1 text-[11px] font-medium text-base-content/60 transition hover:text-base-content"
+            title="Open a new script with this sketch kept at the top"
+          >
+            <.icon name="hero-document-plus" class="size-3.5" /> Start a script from this
+          </button>
         </div>
 
         <p :if={@notes == []} class="py-6 text-center text-sm text-base-content/40">
-          No notes yet.
+          {if @kind == "sketch",
+            do: "No sketches yet. Keep ideas that aren't a script yet here.",
+            else: "No notes yet."}
         </p>
       </div>
     </div>

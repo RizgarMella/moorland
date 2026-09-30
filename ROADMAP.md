@@ -240,7 +240,9 @@ ships, and what is still open.
   *First step:* a `kind` on Note (`note` | `sketch`), a Sketches tab in the
   Notes pane, and "Start a script from this sketch" calling
   `Scripts.create_script`; sync is free once `kind` rides in the note
-  payload. *Open:* sketches before any script exists need a home above
+  payload. *First step shipped (Sep 30 2026):* exactly that; the new script
+  is titled from the sketch's first line and keeps the sketch in its
+  boneyard, and notes from peers without a `kind` keep theirs. *Open:* sketches before any script exists need a home above
   scripts (a project, see the pipeline, or a nullable `script_id`); whether
   the Shelf folds into this.
 - **Short stories and books** [prose] — prose as a first-class document;
