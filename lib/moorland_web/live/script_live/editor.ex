@@ -1,8 +1,10 @@
 defmodule MoorlandWeb.ScriptLive.Editor do
   use MoorlandWeb, :live_view
 
+  import MoorlandWeb.BreakdownComponents, only: [breakdown_panel: 1, scene_for_line: 2]
+
   alias Moorland.Scripts
-  alias Moorland.Scripts.Stats
+  alias Moorland.Scripts.{Breakdown, Stats}
   alias MoorlandWeb.Presence
 
   @impl true
@@ -37,9 +39,13 @@ defmodule MoorlandWeb.ScriptLive.Editor do
         sprint: nil,
         lookup_q: "",
         lookup_result: nil,
+        tag_draft: nil,
+        breakdown: nil,
+        tags: Scripts.list_breakdown_tags(script),
         presences: presence_list(script.id)
       )
       |> load_panel_data()
+      |> push_tags()
 
     {:ok, socket, layout: false}
   end
@@ -57,6 +63,28 @@ defmodule MoorlandWeb.ScriptLive.Editor do
       bin: Scripts.list_bin(script),
       shelf: Scripts.list_shelf(socket.assigns.current_scope)
     )
+  end
+
+  # The preview highlights tagged words; the hook finds them itself, near
+  # the recorded line, so highlights follow text as it moves while typing.
+  defp push_tags(socket) do
+    tags =
+      for tag <- socket.assigns.tags, tag.anchor_text do
+        %{text: tag.anchor_text, line: tag.line_no, category: tag.category, name: tag.name}
+      end
+
+    push_event(socket, "breakdown_tags", %{tags: tags})
+  end
+
+  defp build_breakdown(socket) do
+    if socket.assigns.panel == "breakdown",
+      do:
+        assign(
+          socket,
+          :breakdown,
+          Breakdown.build(socket.assigns.script.content, socket.assigns.tags)
+        ),
+      else: assign(socket, :breakdown, nil)
   end
 
   defp presence_list(script_id) do
@@ -97,6 +125,51 @@ defmodule MoorlandWeb.ScriptLive.Editor do
     {:noreply, assign(socket, :anchor, %{line: line, text: String.trim(text)})}
   end
 
+  def handle_event("tag_selection", %{"line" => line, "text" => text}, socket) do
+    {:noreply,
+     socket
+     |> assign(tag_draft: %{line: line, text: String.trim(text)}, panel: "breakdown")
+     |> build_breakdown()}
+  end
+
+  def handle_event("create_tag", params, socket) do
+    %{current_scope: scope, script: script, tag_draft: draft} = socket.assigns
+
+    attrs = %{
+      category: params["category"],
+      name: params["name"],
+      anchor_text: draft && draft.text,
+      line_no: draft && draft.line
+    }
+
+    case draft && Scripts.create_breakdown_tag(scope, script, attrs) do
+      {:ok, _tag} ->
+        {:noreply, assign(socket, :tag_draft, nil)}
+
+      {:error, :not_allowed} ->
+        {:noreply, put_flash(socket, :error, "You can't tag this script.")}
+
+      {:error, _cs} ->
+        {:noreply, put_flash(socket, :error, "Give the element a name.")}
+
+      nil ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("cancel_tag", _params, socket) do
+    {:noreply, assign(socket, :tag_draft, nil)}
+  end
+
+  def handle_event("remove_tags", %{"ids" => ids}, socket) do
+    %{current_scope: scope, script: script} = socket.assigns
+
+    for id <- String.split(ids, ",", trim: true),
+        do: Scripts.delete_breakdown_tag(scope, script, id)
+
+    {:noreply, socket}
+  end
+
   def handle_event("comment_on_selection", %{"line" => line, "text" => text}, socket) do
     {:noreply,
      socket
@@ -122,7 +195,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
 
   def handle_event("toggle_panel", %{"panel" => panel}, socket) do
     new_panel = if(socket.assigns.panel == panel, do: nil, else: panel)
-    socket = assign(socket, panel: new_panel, diff: nil)
+    socket = socket |> assign(panel: new_panel, diff: nil) |> build_breakdown()
 
     if new_panel == "comments" do
       Scripts.mark_notifications_read(socket.assigns.current_scope, socket.assigns.script)
@@ -505,6 +578,8 @@ defmodule MoorlandWeb.ScriptLive.Editor do
         do: assign(socket, :stats, Stats.compute(content)),
         else: socket
 
+    socket = build_breakdown(socket)
+
     if user_id != socket.assigns.current_scope.user.id do
       {:noreply, push_event(socket, "remote_content", %{content: content, version: version})}
     else
@@ -520,6 +595,14 @@ defmodule MoorlandWeb.ScriptLive.Editor do
   def handle_info({event, _id}, socket)
       when event in [:comments_changed, :notes_changed, :versions_changed, :collaborators_changed] do
     {:noreply, load_panel_data(socket)}
+  end
+
+  def handle_info({:breakdown_changed, _id}, socket) do
+    {:noreply,
+     socket
+     |> assign(:tags, Scripts.list_breakdown_tags(socket.assigns.script))
+     |> build_breakdown()
+     |> push_tags()}
   end
 
   def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
@@ -797,6 +880,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
                   {"lookup", "hero-book-open", "Lookup"},
                   {"history", "hero-clock", "History"},
                   {"reports", "hero-chart-bar", "Reports"},
+                  {"breakdown", "hero-tag", "Breakdown"},
                   {"share", "hero-user-plus", "Share"}
                 ]
               }
@@ -822,7 +906,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
         </div>
       </header>
 
-      <div class="flex min-h-0 flex-1">
+      <div class={["flex min-h-0 flex-1", @panel == "breakdown" && "bd-show"]}>
         <div
           id="editor-root"
           phx-hook="ScreenplayEditor"
@@ -885,6 +969,13 @@ defmodule MoorlandWeb.ScriptLive.Editor do
               </button>
               <button
                 type="button"
+                data-tag
+                title="Tag this for the breakdown: a prop, costume, vehicle, effect…"
+              >
+                <.icon name="hero-tag" class="size-3.5" /> Tag
+              </button>
+              <button
+                type="button"
                 data-goto
                 title="Jump to this spot in the editor (expands it if collapsed)"
               >
@@ -930,6 +1021,15 @@ defmodule MoorlandWeb.ScriptLive.Editor do
             role={@role}
             char_meta={@char_meta}
             sprint={@sprint}
+          />
+          <.breakdown_panel
+            :if={@panel == "breakdown"}
+            script={@script}
+            role={@role}
+            user_id={@current_scope.user.id}
+            draft={@tag_draft}
+            scene={scene_for_line(@breakdown, (@tag_draft || @anchor || %{line: nil}).line)}
+            unplaced={length(@breakdown.unplaced)}
           />
           <.share_panel
             :if={@panel == "share"}

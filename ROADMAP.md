@@ -134,6 +134,15 @@ it wrote; the origin's owner can delete anything and the next pull follows.
   wardrobe, SFX/VFX…) by highlighting preview text (the comment-anchoring
   mechanism); auto-seed cast/locations from the parser; per-scene sheets and
   per-department reports.
+  *Shipped (Sep 30 2026):* `BreakdownTag` rows (category, name, anchor words
+  and line) placed into scenes fresh from the text by `Scripts.Breakdown`, so
+  tags follow their words and report as unplaced when the words are cut;
+  13 standard categories with colours; Tag in the preview's selection bubble
+  and a Breakdown panel in the editor; `/scripts/:id/breakdown` with printable
+  scene sheets (eighths, INT/EXT, time of day, speaking cast seeded) and a
+  department view with rename/recategorise. Left: peer sync of tags (the
+  sync fields are in place), CSV export, and the stripboard that grows out
+  of the scene sheets.
 - **Stripboard / shooting schedule** [production] — scenes as colored strips
   (INT/EXT, day/night, page-eighths from the pagination model) dragged into
   shoot days; grows out of the scene navigator's drag-reorder.

@@ -12,20 +12,14 @@ defmodule Moorland.Scripts.Stats do
   @known_times ~w(DAY NIGHT MORNING EVENING AFTERNOON DUSK DAWN CONTINUOUS LATER SAME SUNSET SUNRISE)
 
   def compute(text) do
-    lines =
-      (text || "")
-      |> strip_boneyard()
-      |> String.split("\n")
-      |> strip_title_page()
+    elements = elements(text)
 
-    elements = classify(lines)
-
-    scenes = for {:scene, text} <- elements, do: text
+    scenes = for {:scene, text, _line} <- elements, do: text
     characters = character_stats(elements)
 
     words =
       elements
-      |> Enum.map(fn {_type, text} -> length(String.split(text, ~r/\s+/, trim: true)) end)
+      |> Enum.map(fn {_type, text, _line} -> length(String.split(text, ~r/\s+/, trim: true)) end)
       |> Enum.sum()
 
     cost = Enum.reduce(elements, 0, fn el, acc -> acc + cost_of(el) end)
@@ -43,6 +37,103 @@ defmodule Moorland.Scripts.Stats do
     }
   end
 
+  @doc """
+  Every scene in document order, numbered from 1 as the preview numbers them.
+  `line` and `end_line` are 0-based source lines (the heading, and the last
+  line before the next heading). `eighths` is the scene's length in eighths
+  of a page, never less than one; `cast` lists who speaks in it.
+  """
+  def scenes(text) do
+    elements = elements(text)
+    line_count = length(String.split(text || "", "\n"))
+
+    {scenes, current} =
+      Enum.reduce(elements, {[], nil}, fn
+        {:scene, heading, line}, {acc, current} ->
+          {close_scene(current, acc), new_scene(heading, line)}
+
+        _el, {acc, nil} ->
+          {acc, nil}
+
+        el, {acc, scene} ->
+          {acc, add_to_scene(scene, el)}
+      end)
+
+    scenes = close_scene(current, scenes) |> Enum.reverse()
+
+    scenes
+    |> Enum.with_index()
+    |> Enum.map(fn {scene, i} ->
+      next = Enum.at(scenes, i + 1)
+      end_line = if next, do: next.line - 1, else: max(scene.line, line_count - 1)
+      Map.merge(scene, %{number: i + 1, end_line: end_line})
+    end)
+  end
+
+  @doc "The location part of a scene heading: `INT. KITCHEN - NIGHT` gives `KITCHEN`."
+  def location(heading) do
+    heading
+    |> String.replace(@scene_re, "")
+    |> String.split(~r/\s+-\s+/)
+    |> List.first()
+    |> String.trim()
+  end
+
+  @doc "`:int`, `:ext`, `:int_ext` or `:other` for a scene heading."
+  def int_ext_of(heading) do
+    cond do
+      Regex.match?(~r/^(INT\.\/EXT|INT\/EXT|I\/E)/, heading) -> :int_ext
+      String.starts_with?(heading, "INT") -> :int
+      String.starts_with?(heading, "EXT") -> :ext
+      true -> :other
+    end
+  end
+
+  @doc "The time-of-day part of a scene heading, or `nil` when it has none."
+  def time_of(heading) do
+    case String.split(heading, ~r/\s+-\s+/) do
+      [_] -> nil
+      parts -> parts |> List.last() |> String.trim()
+    end
+  end
+
+  defp new_scene(heading, line) do
+    %{
+      line: line,
+      heading: heading,
+      int_ext: int_ext_of(heading),
+      time: time_of(heading),
+      location: location(heading),
+      cost: cost_of({:scene, heading, line}),
+      cast: []
+    }
+  end
+
+  defp add_to_scene(scene, {:character, t, _line} = el) do
+    name = cue_name(t)
+    cast = if name in scene.cast, do: scene.cast, else: scene.cast ++ [name]
+    %{scene | cost: scene.cost + cost_of(el), cast: cast}
+  end
+
+  defp add_to_scene(scene, el), do: %{scene | cost: scene.cost + cost_of(el)}
+
+  defp close_scene(nil, acc), do: acc
+
+  defp close_scene(scene, acc) do
+    eighths = max(1, ceil(scene.cost * 8 / @lines_per_page))
+    [scene |> Map.delete(:cost) |> Map.put(:eighths, eighths) | acc]
+  end
+
+  # Classified elements as {type, text, source_line}. Boneyard and title page
+  # are blanked rather than dropped, so line numbers match the source.
+  defp elements(text) do
+    (text || "")
+    |> strip_boneyard()
+    |> String.split("\n")
+    |> strip_title_page()
+    |> classify()
+  end
+
   defp strip_boneyard(text) do
     Regex.replace(~r/\/\*[\s\S]*?\*\//, text, fn match ->
       match |> String.replace(~r/[^\n]/, "")
@@ -51,10 +142,13 @@ defmodule Moorland.Scripts.Stats do
 
   defp strip_title_page([first | _] = lines) do
     if Regex.match?(@title_key_re, first) do
-      Enum.drop_while(lines, fn line ->
-        String.trim(line) != "" and
-          (Regex.match?(@title_key_re, line) or Regex.match?(~r/^\s+\S/, line))
-      end)
+      {title, rest} =
+        Enum.split_while(lines, fn line ->
+          String.trim(line) != "" and
+            (Regex.match?(@title_key_re, line) or Regex.match?(~r/^\s+\S/, line))
+        end)
+
+      List.duplicate("", length(title)) ++ rest
     else
       lines
     end
@@ -78,32 +172,32 @@ defmodule Moorland.Scripts.Stats do
           {acc, false}
 
         String.starts_with?(t, "#") ->
-          {[{:section, String.replace(t, ~r/^#+\s*/, "")} | acc], false}
+          {[{:section, String.replace(t, ~r/^#+\s*/, ""), i} | acc], false}
 
         String.starts_with?(t, "=") ->
-          {[{:synopsis, String.replace(t, ~r/^=\s*/, "")} | acc], false}
+          {[{:synopsis, String.replace(t, ~r/^=\s*/, ""), i} | acc], false}
 
         String.starts_with?(t, ">") and String.ends_with?(t, "<") ->
-          {[{:centered, t} | acc], false}
+          {[{:centered, t, i} | acc], false}
 
         scene_heading?(t) and prev_blank ->
           heading = t |> String.trim_leading(".") |> String.upcase()
-          {[{:scene, heading} | acc], false}
+          {[{:scene, heading, i} | acc], false}
 
         transition?(t) and prev_blank ->
-          {[{:transition, t} | acc], false}
+          {[{:transition, t, i} | acc], false}
 
         character_cue?(t, prev_blank, next_line) ->
-          {[{:character, t} | acc], true}
+          {[{:character, t, i} | acc], true}
 
         in_dialogue and String.starts_with?(t, "(") and String.ends_with?(t, ")") ->
-          {[{:parenthetical, t} | acc], true}
+          {[{:parenthetical, t, i} | acc], true}
 
         in_dialogue ->
-          {[{:dialogue, String.trim_leading(t, "~")} | acc], true}
+          {[{:dialogue, String.trim_leading(t, "~"), i} | acc], true}
 
         true ->
-          {[{:action, t} | acc], false}
+          {[{:action, t, i} | acc], false}
       end
     end)
     |> elem(0)
@@ -149,33 +243,33 @@ defmodule Moorland.Scripts.Stats do
     |> String.trim()
   end
 
-  defp cost_of({:scene, t}), do: rows(t, 60) + 2
-  defp cost_of({:action, t}), do: rows(t, 60) + 1
-  defp cost_of({:character, _}), do: 2
-  defp cost_of({:parenthetical, t}), do: rows(t, 25)
-  defp cost_of({:dialogue, t}), do: rows(t, 35)
-  defp cost_of({:transition, _}), do: 2
-  defp cost_of({:centered, _}), do: 2
-  defp cost_of({:section, _}), do: 2
-  defp cost_of({:synopsis, _}), do: 1
+  defp cost_of({:scene, t, _}), do: rows(t, 60) + 2
+  defp cost_of({:action, t, _}), do: rows(t, 60) + 1
+  defp cost_of({:character, _, _}), do: 2
+  defp cost_of({:parenthetical, t, _}), do: rows(t, 25)
+  defp cost_of({:dialogue, t, _}), do: rows(t, 35)
+  defp cost_of({:transition, _, _}), do: 2
+  defp cost_of({:centered, _, _}), do: 2
+  defp cost_of({:section, _, _}), do: 2
+  defp cost_of({:synopsis, _, _}), do: 1
 
   defp rows(t, width), do: max(1, ceil(String.length(t) / width))
 
   defp character_stats(elements) do
     {stats, _current} =
       Enum.reduce(elements, {%{}, nil}, fn
-        {:character, t}, {stats, _} ->
+        {:character, t, _}, {stats, _} ->
           name = cue_name(t)
           {Map.put_new(stats, name, %{lines: 0, words: 0}), name}
 
-        {:dialogue, t}, {stats, current} when current != nil ->
+        {:dialogue, t, _}, {stats, current} when current != nil ->
           words = length(String.split(t, ~r/\s+/, trim: true))
 
           {Map.update!(stats, current, fn s ->
              %{s | lines: s.lines + 1, words: s.words + words}
            end), current}
 
-        {:parenthetical, _}, {stats, current} ->
+        {:parenthetical, _, _}, {stats, current} ->
           {stats, current}
 
         _other, {stats, _} ->
@@ -189,18 +283,11 @@ defmodule Moorland.Scripts.Stats do
 
   defp int_ext(scenes) do
     Enum.reduce(scenes, %{int: 0, ext: 0, other: 0}, fn heading, acc ->
-      cond do
-        Regex.match?(~r/^(INT\.\/EXT|INT\/EXT|I\/E)/, heading) ->
-          %{acc | int: acc.int + 1, ext: acc.ext + 1}
-
-        String.starts_with?(heading, "INT") ->
-          %{acc | int: acc.int + 1}
-
-        String.starts_with?(heading, "EXT") ->
-          %{acc | ext: acc.ext + 1}
-
-        true ->
-          %{acc | other: acc.other + 1}
+      case int_ext_of(heading) do
+        :int_ext -> %{acc | int: acc.int + 1, ext: acc.ext + 1}
+        :int -> %{acc | int: acc.int + 1}
+        :ext -> %{acc | ext: acc.ext + 1}
+        :other -> %{acc | other: acc.other + 1}
       end
     end)
   end
@@ -223,13 +310,7 @@ defmodule Moorland.Scripts.Stats do
 
   defp locations(scenes) do
     scenes
-    |> Enum.map(fn heading ->
-      heading
-      |> String.replace(@scene_re, "")
-      |> String.split(~r/\s+-\s+/)
-      |> List.first()
-      |> String.trim()
-    end)
+    |> Enum.map(&location/1)
     |> Enum.reject(&(&1 == ""))
     |> Enum.frequencies()
     |> Enum.sort_by(fn {name, count} -> {-count, name} end)

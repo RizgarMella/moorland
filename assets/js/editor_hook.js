@@ -12,6 +12,7 @@ import { smartFormatOnEnter, tidyDocument } from "./smart_format"
 import { sceneList, navList, moveScene } from "./scene_tools"
 import { fountainToFdx } from "./fdx"
 import { applyUI, autoHideHeader, typewriterOn } from "./ui_prefs"
+import { markTags } from "./breakdown_marks"
 
 const AUTOSAVE_MS = 1200
 const SCENE_START_RE = /^(INT\.\/EXT\.|INT\/EXT|INT\.?|EXT\.?|EST\.?|I\/E)\s+/i
@@ -70,6 +71,7 @@ export const ScreenplayEditor = {
     this.suggestions = []
     this.selectedIndex = 0
     this.pendingSelection = null
+    this.breakdownTags = []
 
     // The content_version our edits are built on - the merge base for saves.
     this.baseVersion = parseInt(this.el.dataset.contentVersion || "0", 10)
@@ -134,6 +136,14 @@ export const ScreenplayEditor = {
       this.bubble.querySelector("[data-comment]")?.addEventListener("mousedown", (e) => {
         e.preventDefault()
         this.commentOnSelection()
+      })
+      this.bubble.querySelector("[data-tag]")?.addEventListener("mousedown", (e) => {
+        e.preventDefault()
+        if (this.pendingSelection) {
+          this.pushEvent("tag_selection", this.pendingSelection)
+          window.getSelection()?.removeAllRanges()
+        }
+        this.hideBubble()
       })
       this.bubble.querySelector("[data-goto]")?.addEventListener("mousedown", (e) => {
         e.preventDefault()
@@ -227,6 +237,10 @@ export const ScreenplayEditor = {
       this.refreshVocab()
     })
     this.handleEvent("save_error", () => this.setStatus("saving"))
+    this.handleEvent("breakdown_tags", ({ tags }) => {
+      this.breakdownTags = tags
+      this.renderPreview()
+    })
     this.handleEvent("jump_to_line", ({ line }) => this.jumpToLine(line))
     this.handleEvent("scene_nav", ({ open }) => {
       if (this.sceneNav) {
@@ -552,6 +566,7 @@ export const ScreenplayEditor = {
   renderPreview() {
     if (this.preview) {
       this.preview.innerHTML = renderHtml(this.textarea.value, { helpers: this.canEdit })
+      markTags(this.preview, this.breakdownTags)
     }
   },
 
@@ -642,7 +657,7 @@ export const ScreenplayEditor = {
         8,
         Math.min(
           rect.left - wrap.left + this.previewWrap.scrollLeft,
-          this.previewWrap.clientWidth - 140
+          this.previewWrap.clientWidth - 230
         )
       )}px`
       this.bubble.hidden = false

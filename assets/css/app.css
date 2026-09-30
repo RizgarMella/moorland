@@ -722,6 +722,95 @@ body.mo-typewriter [data-typewriter] {
   white-space: nowrap;
 }
 
+/* ---- Script breakdown ----------------------------------------------------- */
+
+/* One colour per breakdown category, shared by the chips in the Breakdown
+   panel and page and the tag highlights in the preview. */
+.bd-cat-cast { --bd: #dc2626; }
+.bd-cat-extras { --bd: #16a34a; }
+.bd-cat-stunts { --bd: #ea580c; }
+.bd-cat-props { --bd: #7c3aed; }
+.bd-cat-set_dressing { --bd: #92400e; }
+.bd-cat-wardrobe { --bd: #0891b2; }
+.bd-cat-makeup { --bd: #db2777; }
+.bd-cat-vehicles { --bd: #c026d3; }
+.bd-cat-animals { --bd: #65a30d; }
+.bd-cat-sfx { --bd: #2563eb; }
+.bd-cat-vfx { --bd: #0d9488; }
+.bd-cat-sound { --bd: #b45309; }
+.bd-cat-equipment { --bd: #475569; }
+
+[data-theme=dark] .bd-cat-set_dressing { --bd: #d97706; }
+[data-theme=dark] .bd-cat-equipment { --bd: #94a3b8; }
+
+.bd-dot {
+  background: var(--bd);
+}
+
+.bd-chip {
+  border-color: color-mix(in srgb, var(--bd) 35%, transparent);
+  background: color-mix(in srgb, var(--bd) 10%, transparent);
+}
+
+.bd-chip:hover {
+  border-color: var(--bd);
+}
+
+.bd-rule {
+  border-top: 3px solid var(--bd);
+}
+
+/* A category picker button; the checked one fills with its colour. */
+.bd-pick {
+  border-color: color-mix(in srgb, var(--bd) 30%, transparent);
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.bd-pick:hover {
+  border-color: var(--bd);
+}
+
+input:checked + .bd-pick {
+  background: var(--bd);
+  border-color: var(--bd);
+  color: #fff;
+}
+
+/* Tagged words in the preview: a tint and an underline in the category's
+   colour. Hidden while the Breakdown overlay is off. */
+.screenplay mark.bd-mark {
+  color: inherit;
+  background: transparent;
+  border-radius: 2px;
+}
+
+.bd-show .screenplay mark.bd-mark {
+  background: color-mix(in srgb, var(--bd) 16%, transparent);
+  box-shadow: inset 0 -2px 0 var(--bd);
+}
+
+.bd-sheet {
+  break-inside: avoid;
+}
+
+@media print {
+  .bd-print-sheets .bd-sheet {
+    break-after: page;
+    border-color: #000;
+  }
+
+  .bd-print-sheets .bd-sheet:last-child {
+    break-after: auto;
+  }
+
+  .bd-dot,
+  .bd-chip,
+  .bd-rule {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
+
 /* ---- Print / PDF ---------------------------------------------------------- */
 
 .print-screenplay {

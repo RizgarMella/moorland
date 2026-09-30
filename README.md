@@ -74,6 +74,23 @@ Page count, estimated running time, speaking parts with each character's
 share of dialogue, scene mix by interior and exterior and by day and night,
 locations, and a dialogue balance line from optional gender tags.
 
+### Script breakdown
+
+- **Tag as you read.** Highlight words in the preview and choose **Tag** to
+  mark a prop, costume, vehicle, stunt, effect or anything else a department
+  needs. Thirteen standard breakdown categories, each with its own colour,
+  and tagged words stay highlighted in the preview.
+- **Cast fills itself in.** Everyone who speaks in a scene is already on its
+  sheet.
+- **Scene sheets.** One sheet per scene with its number, INT or EXT, time of
+  day and length in eighths of a page, every tagged element by department,
+  and a box for adding elements the text doesn't mention. Print them, one
+  scene to a page.
+- **Department view.** Every prop, costume or effect with the scenes it
+  appears in. Rename or recategorise an element everywhere at once.
+- **Tags follow the words.** Rewrite or reorder scenes and each tag stays
+  with its text. If the words are cut, the tag is flagged instead of lost.
+
 ### Working with someone on another machine
 
 Moorland installations link to each other directly.

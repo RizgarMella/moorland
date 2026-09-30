@@ -24,7 +24,9 @@ defmodule Moorland.Scripts do
     CharacterMeta,
     Snippet,
     Notification,
-    Activity
+    Activity,
+    Breakdown,
+    BreakdownTag
   }
 
   @auto_snapshot_interval_seconds 10 * 60
@@ -590,6 +592,107 @@ defmodule Moorland.Scripts do
       _ -> {:error, :not_allowed}
     end
   end
+
+  ## Breakdown
+
+  def list_breakdown_tags(%Script{} = script) do
+    from(t in BreakdownTag,
+      where: t.script_id == ^script.id,
+      order_by: [asc: t.category, asc: t.name, asc: t.id],
+      preload: [:author]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Tags an element at a spot in the script. `anchor_text` is trimmed to the
+  words actually on `line_no` (see `Breakdown.fit_anchor/3`); with no anchor
+  the tag belongs to the scene whose heading is on `line_no`. Anyone who may
+  comment may tag: a breakdown annotates the script without changing it.
+  """
+  def create_breakdown_tag(%Scope{user: user} = scope, %Script{} = script, attrs) do
+    with :ok <- authorize(scope, script, :comment) do
+      attrs = Map.new(attrs, fn {k, v} -> {to_string(k), v} end)
+      line_no = parse_line(attrs["line_no"])
+
+      anchor =
+        case attrs["anchor_text"] do
+          text when is_binary(text) and text != "" ->
+            Breakdown.fit_anchor(script.content, line_no, text)
+
+          _ ->
+            nil
+        end
+
+      %BreakdownTag{script_id: script.id, author_id: user.id}
+      |> BreakdownTag.changeset(
+        Map.merge(attrs, %{"line_no" => line_no, "anchor_text" => anchor})
+      )
+      |> Repo.insert()
+      |> case do
+        {:ok, tag} ->
+          broadcast(script.id, {:breakdown_changed, script.id})
+          {:ok, Repo.preload(tag, :author)}
+
+        error ->
+          error
+      end
+    end
+  end
+
+  @doc "Removes one tag. Its author, or anyone who may edit the script, may."
+  def delete_breakdown_tag(%Scope{user: user} = scope, %Script{} = script, tag_id) do
+    with %BreakdownTag{script_id: sid} = tag when sid == script.id <-
+           Repo.get(BreakdownTag, tag_id),
+         true <- tag.author_id == user.id or can_edit?(role(scope, script)) do
+      Repo.delete(tag)
+      broadcast(script.id, {:breakdown_changed, script.id})
+      :ok
+    else
+      _ -> {:error, :not_allowed}
+    end
+  end
+
+  @doc """
+  Renames an element, moves it to another category, or both, across every
+  tag it has. Needs edit rights, since it rewrites other people's tags.
+  """
+  def update_breakdown_element(%Scope{} = scope, %Script{} = script, category, key, attrs) do
+    with :ok <- authorize(scope, script, :edit) do
+      tags =
+        from(t in BreakdownTag, where: t.script_id == ^script.id and t.category == ^category)
+        |> Repo.all()
+        |> Enum.filter(&(Breakdown.element_key(&1.name) == key))
+
+      changesets =
+        Enum.map(tags, fn tag ->
+          tag
+          |> BreakdownTag.changeset(Map.take(attrs, [:name, :category, "name", "category"]))
+          |> Ecto.Changeset.put_change(:rev, tag.rev + 1)
+        end)
+
+      case Enum.find(changesets, &(not &1.valid?)) do
+        nil ->
+          Repo.transaction(fn -> Enum.each(changesets, &Repo.update!/1) end)
+          broadcast(script.id, {:breakdown_changed, script.id})
+          {:ok, length(changesets)}
+
+        invalid ->
+          {:error, invalid}
+      end
+    end
+  end
+
+  defp parse_line(n) when is_integer(n) and n >= 0, do: n
+
+  defp parse_line(n) when is_binary(n) do
+    case Integer.parse(n) do
+      {i, _} when i >= 0 -> i
+      _ -> 0
+    end
+  end
+
+  defp parse_line(_n), do: 0
 
   ## Peer sharing (origin side: this installation owns the script)
 
