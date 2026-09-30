@@ -169,7 +169,13 @@ it wrote; the origin's owner can delete anything and the next pull follows.
   production set because it depends on breakdown and stripboard.
   *Day out of days shipped (Sep 30 2026)* as a view of the stripboard
   (`Schedule.day_out_of_days/1`: SW/W/WF/SWF/H per cast member per shoot
-  day, work and hold totals).
+  day, work and hold totals). *Call sheets shipped (Sep 30 2026)* at
+  `/scripts/:id/schedule/day/:n`, printable: crew/shooting call, location
+  and per-cast calls stored on the day's break, scenes with synopses, cast
+  with DOOD status and actors from the viewer's Contacts by role,
+  department needs from the breakdown, advance schedule. Left: map and
+  weather (need the network), attachments, and distribution with
+  received/confirmed tracking, which waits on peer sync of the schedule.
 
 ## Tier 4 — Epic (multi-week, architectural)
 

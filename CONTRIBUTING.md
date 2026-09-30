@@ -62,7 +62,8 @@ lib/moorland/
   scripts/breakdown.ex     Breakdown as pure functions: places tags in scenes
                            by their words, builds scene sheets and departments
   scripts/schedule.ex      Stripboard as pure functions: matches strips to
-                           scenes, numbers cast, totals shoot days
+                           scenes, numbers cast, totals shoot days, day out
+                           of days and call sheets
   storage.ex               Data folder, relocation, .fountain mirroring
   updates.ex               GitHub release checker behind the update banner
   peers.ex                 Installation identity, peer codes, trust
@@ -79,7 +80,9 @@ lib/moorland_web/
   live/script_live/index.ex    Dashboard: scripts, search, import, updates
   live/script_live/editor.ex   The editor: toolbar, panels, every event
   live/script_live/breakdown.ex  Breakdown page: scene sheets, departments
-  live/script_live/schedule.ex   Stripboard, with its drag and drop hook
+  live/script_live/schedule.ex   Stripboard and day out of days, with the
+                                 drag and drop hook
+  live/script_live/call_sheet.ex Printable call sheet for one shoot day
   components/breakdown_components.ex  Breakdown panel and shared pieces
   live/peer_live/index.ex      Peers, storage, identity, update check
   live/contact_live/index.ex   Contacts

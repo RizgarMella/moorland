@@ -757,12 +757,21 @@ defmodule Moorland.Scripts do
     end
   end
 
-  @doc "Sets a day break's shoot date and note."
+  @doc "Sets a day break's shoot date, note and call sheet details."
   def update_day_break(%Scope{} = scope, %Script{} = script, item_id, attrs) do
     with :ok <- authorize(scope, script, :edit),
          %ScheduleItem{kind: "day"} = item <- get_schedule_item(script, item_id) do
       item
-      |> ScheduleItem.day_changeset(Map.take(stringify(attrs), ["shoot_date", "note"]))
+      |> ScheduleItem.day_changeset(
+        Map.take(stringify(attrs), [
+          "shoot_date",
+          "note",
+          "crew_call",
+          "shooting_call",
+          "location",
+          "cast_calls"
+        ])
+      )
       |> Repo.update()
       |> tap_schedule(script)
     else

@@ -134,8 +134,10 @@ defmodule Moorland.Scripts.ScheduleTest do
     Four.
     """
 
-    defp dood_board do
-      items = [
+    defp dood_board, do: Schedule.build(@dood, [], dood_board_items())
+
+    defp dood_board_items do
+      [
         strip(0, "INT. ONE - DAY", 0),
         item(%{kind: "day", position: 1, shoot_date: ~D[2026-10-12], note: "Stage 2"}),
         strip(2, "INT. TWO - DAY", 5),
@@ -145,8 +147,6 @@ defmodule Moorland.Scripts.ScheduleTest do
         day(6),
         strip(7, "INT. FOUR - DAY", 18)
       ]
-
-      Schedule.build(@dood, [], items)
     end
 
     test "lists each day with its scenes, cast and page total" do
@@ -168,6 +168,30 @@ defmodule Moorland.Scripts.ScheduleTest do
       assert by_name["BEN"].codes == [nil, "SW", "WF", nil]
       assert by_name["CARL"].codes == [nil, nil, nil, "SWF"]
       assert %{work: 1, hold: 0} = by_name["CARL"]
+    end
+
+    test "builds a day's call sheet with held cast and the advance schedule" do
+      prop = %{
+        id: 1,
+        category: "props",
+        name: "Kettle",
+        anchor_text: "Three",
+        line_no: 12,
+        author: nil
+      }
+
+      board = Schedule.build(@dood, [prop], dood_board_items())
+      sheet = Schedule.call_sheet(board, 2)
+
+      assert %{index: 2, total: 4, day: %{day: 2}, next: %{day: 4}, prev: %{day: 1}} = sheet
+      assert Enum.map(sheet.cast, &{&1.name, &1.code}) == [{"ANNA", "H"}, {"BEN", "SW"}]
+      assert sheet.departments == []
+
+      assert [{"props", [%{name: "Kettle", scenes: [3]}]}] =
+               Schedule.call_sheet(board, 4).departments
+
+      assert Schedule.call_sheet(board, 3) == nil
+      assert Schedule.call_sheet(board, 5).next == nil
     end
 
     test "leaves out cast who are not on the board" do

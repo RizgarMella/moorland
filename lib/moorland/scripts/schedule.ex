@@ -15,7 +15,7 @@ defmodule Moorland.Scripts.Schedule do
   lines, alphabetically.
   """
 
-  alias Moorland.Scripts.{Breakdown, Stats}
+  alias Moorland.Scripts.{Breakdown, BreakdownTag, Stats}
 
   @doc """
   Builds the board. Returns `%{rows, unscheduled, cast, days, scheduled_eighths,
@@ -123,6 +123,58 @@ defmodule Moorland.Scripts.Schedule do
 
   # Days are numbered as the board numbers its breaks; a day with no strips
   # (two breaks in a row) keeps its number but is left out.
+  @doc """
+  Everything a call sheet for shoot day `day` needs, or nil if there is no
+  such day: the day (`item` is its end-of-day break, nil for the open day),
+  its place in the shoot (`index` of `total`), the cast called or held
+  with their day-out-of-days code, each department's elements for the
+  day's scenes with the scenes they are in, and the next day's scenes for
+  the advance schedule.
+  """
+  def call_sheet(%{shoot_days: days} = board, day) do
+    case Enum.find_index(days, &(&1.day == day)) do
+      nil ->
+        nil
+
+      index ->
+        this = Enum.at(days, index)
+
+        cast =
+          for row <- day_out_of_days(board).cast,
+              code = Enum.at(row.codes, index),
+              code != nil,
+              do: %{number: row.number, name: row.name, code: code}
+
+        %{
+          day: this,
+          index: index + 1,
+          total: length(days),
+          prev: if(index > 0, do: Enum.at(days, index - 1)),
+          next: Enum.at(days, index + 1),
+          cast: cast,
+          departments: departments(this.scenes)
+        }
+    end
+  end
+
+  defp departments(scenes) do
+    for {category, _label} <- BreakdownTag.categories(), category != "cast" do
+      elements =
+        scenes
+        |> Enum.flat_map(fn scene ->
+          scene.elements |> Map.get(category, []) |> Enum.map(&{&1, scene.number})
+        end)
+        |> Enum.group_by(fn {entry, _n} -> entry.key end)
+        |> Enum.map(fn {_key, [{first, _} | _] = rows} ->
+          %{name: first.name, scenes: rows |> Enum.map(&elem(&1, 1)) |> Enum.uniq()}
+        end)
+        |> Enum.sort_by(&String.downcase(&1.name))
+
+      {category, elements}
+    end
+    |> Enum.reject(fn {_category, elements} -> elements == [] end)
+  end
+
   defp shoot_days(rows) do
     {days, open, day} =
       Enum.reduce(rows, {[], [], 1}, fn
@@ -146,6 +198,7 @@ defmodule Moorland.Scripts.Schedule do
 
     %{
       day: day,
+      item: item,
       date: item && item.shoot_date,
       note: item && item.note,
       scenes: Enum.map(strips, & &1.scene),

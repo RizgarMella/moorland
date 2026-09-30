@@ -41,7 +41,9 @@ defmodule Moorland.Scripts.Stats do
   Every scene in document order, numbered from 1 as the preview numbers them.
   `line` and `end_line` are 0-based source lines (the heading, and the last
   line before the next heading). `eighths` is the scene's length in eighths
-  of a page, never less than one; `cast` lists who speaks in it.
+  of a page, never less than one; `cast` lists who speaks in it;
+  `synopsis` is the scene's `= synopsis` line, else its first line of
+  action, cut to a line's length (or nil).
   """
   def scenes(text) do
     elements = elements(text)
@@ -105,7 +107,9 @@ defmodule Moorland.Scripts.Stats do
       time: time_of(heading),
       location: location(heading),
       cost: cost_of({:scene, heading, line}),
-      cast: []
+      cast: [],
+      synopsis: nil,
+      first_action: nil
     }
   end
 
@@ -115,13 +119,40 @@ defmodule Moorland.Scripts.Stats do
     %{scene | cost: scene.cost + cost_of(el), cast: cast}
   end
 
+  defp add_to_scene(%{synopsis: nil} = scene, {:synopsis, t, _line} = el),
+    do: %{scene | cost: scene.cost + cost_of(el), synopsis: t}
+
+  defp add_to_scene(%{first_action: nil} = scene, {:action, t, _line} = el),
+    do: %{scene | cost: scene.cost + cost_of(el), first_action: t}
+
   defp add_to_scene(scene, el), do: %{scene | cost: scene.cost + cost_of(el)}
 
   defp close_scene(nil, acc), do: acc
 
   defp close_scene(scene, acc) do
     eighths = max(1, ceil(scene.cost * 8 / @lines_per_page))
-    [scene |> Map.delete(:cost) |> Map.put(:eighths, eighths) | acc]
+
+    synopsis =
+      case scene.synopsis || scene.first_action do
+        nil ->
+          nil
+
+        text ->
+          # Plain words for a one-liner: no *emphasis* or _underline_ marks.
+          text =
+            text
+            |> String.replace(~r/(\*{1,3}|_)(?=\S)(.+?)(?<=\S)\1/, "\\2")
+            |> String.trim_leading("!")
+
+          if String.length(text) > 90, do: String.slice(text, 0, 89) <> "…", else: text
+      end
+
+    [
+      scene
+      |> Map.drop([:cost, :first_action])
+      |> Map.merge(%{eighths: eighths, synopsis: synopsis})
+      | acc
+    ]
   end
 
   # Classified elements as {type, text, source_line}. Boneyard and title page

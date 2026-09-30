@@ -39,7 +39,7 @@ defmodule MoorlandWeb.Layouts do
 
   def app(assigns) do
     ~H"""
-    <header class="flex h-12 items-center gap-4 border-b border-base-300 px-4 sm:px-6 lg:px-8">
+    <header class="flex h-12 items-center gap-4 border-b border-base-300 px-4 sm:px-6 lg:px-8 print:hidden">
       <.link navigate={~p"/"} class="text-sm font-semibold tracking-tight">
         Moorland
       </.link>
@@ -61,7 +61,7 @@ defmodule MoorlandWeb.Layouts do
       </div>
     </header>
 
-    <main class="px-4 py-8 sm:px-6 lg:px-8">
+    <main class="px-4 py-8 sm:px-6 lg:px-8 print:p-0">
       <div class={["mx-auto space-y-4", if(@wide, do: "max-w-6xl", else: "max-w-2xl")]}>
         {render_slot(@inner_block)}
       </div>

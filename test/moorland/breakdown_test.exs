@@ -51,6 +51,20 @@ defmodule Moorland.Scripts.BreakdownTest do
       assert Stats.scenes("INT. A - DAY") |> hd() |> Map.get(:eighths) == 1
     end
 
+    test "gives each scene a one-line synopsis" do
+      [vault, alley] = Stats.scenes(@script)
+      assert vault.synopsis == "RAY cracks the safe with a crowbar. Gunther watches."
+      assert alley.synopsis == "A getaway van idles. The gun lies in a puddle."
+
+      [scene] =
+        Stats.scenes("INT. A - DAY\n\n= The heist goes wrong\n\n#{String.duplicate("x", 200)}")
+
+      assert scene.synopsis == "The heist goes wrong"
+      [long] = Stats.scenes("INT. A - DAY\n\n#{String.duplicate("x", 200)}")
+      assert String.length(long.synopsis) == 90
+      assert Stats.scenes("INT. A - DAY") |> hd() |> Map.get(:synopsis) == nil
+    end
+
     test "is empty for a script without scenes" do
       assert Stats.scenes("Just some action.") == []
       assert Stats.scenes(nil) == []

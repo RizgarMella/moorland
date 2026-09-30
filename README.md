@@ -106,6 +106,10 @@ locations, and a dialogue balance line from optional gender tags.
   strip keeps its place; cut the scene and the strip is flagged.
 - **Day out of days.** The cast-by-day grid, read straight off the board:
   start, work, finish and hold days for every actor, with totals.
+- **Call sheets.** One per shoot day, ready to print: crew and shooting
+  call, location, the day's scenes with a one-line synopsis, who is called
+  or held and at what time, who plays them (from your Contacts, by role),
+  what each department needs, and the next day's scenes.
 
 ### Working with someone on another machine
 

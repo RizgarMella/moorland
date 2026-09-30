@@ -275,7 +275,7 @@ defmodule MoorlandWeb.ScriptLive.Schedule do
           </.link>
         </div>
 
-        <.dood_table :if={@view == "dood"} dood={@dood} />
+        <.dood_table :if={@view == "dood"} dood={@dood} script_id={@script.id} />
 
         <div :if={@view == "board"} class="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
           <section>
@@ -309,7 +309,12 @@ defmodule MoorlandWeb.ScriptLive.Schedule do
 
               <%= for row <- @board.rows do %>
                 <.strip_row :if={row.kind == :strip} row={row} can_edit={@can_edit} />
-                <.day_row :if={row.kind == :day} row={row} can_edit={@can_edit} />
+                <.day_row
+                  :if={row.kind == :day}
+                  row={row}
+                  can_edit={@can_edit}
+                  script_id={@script.id}
+                />
                 <.missing_row :if={row.kind == :missing} row={row} can_edit={@can_edit} />
               <% end %>
             </div>
@@ -319,7 +324,13 @@ defmodule MoorlandWeb.ScriptLive.Schedule do
               id="open-day"
               class="mt-1 flex items-center justify-between rounded-md border border-dashed border-base-300 px-3 py-1.5 text-xs text-base-content/60"
             >
-              <span>Day {@board.open_day.day} so far</span>
+              <.link
+                navigate={~p"/scripts/#{@script.id}/schedule/day/#{@board.open_day.day}"}
+                class="underline-offset-2 hover:underline"
+                title="Open this day's call sheet"
+              >
+                Day {@board.open_day.day} so far
+              </.link>
               <span class="tabular-nums">
                 {@board.open_day.scenes} {if @board.open_day.scenes == 1, do: "scene", else: "scenes"} · {eighths(
                   @board.open_day.eighths
@@ -462,6 +473,7 @@ defmodule MoorlandWeb.ScriptLive.Schedule do
   end
 
   attr :dood, :map, required: true
+  attr :script_id, :integer, required: true
 
   defp dood_table(assigns) do
     ~H"""
@@ -485,7 +497,13 @@ defmodule MoorlandWeb.ScriptLive.Schedule do
                 Cast
               </th>
               <th :for={day <- @dood.days} class="min-w-12 px-1.5 py-2 text-center font-semibold">
-                <div>Day {day.day}</div>
+                <.link
+                  navigate={~p"/scripts/#{@script_id}/schedule/day/#{day.day}"}
+                  class="underline-offset-2 hover:underline"
+                  title="Call sheet"
+                >
+                  Day {day.day}
+                </.link>
                 <div :if={day.date} class="font-normal text-base-content/50">
                   {short_date(day.date)}
                 </div>
@@ -575,6 +593,7 @@ defmodule MoorlandWeb.ScriptLive.Schedule do
 
   attr :row, :map, required: true
   attr :can_edit, :boolean, required: true
+  attr :script_id, :integer, required: true
 
   defp day_row(assigns) do
     ~H"""
@@ -587,7 +606,13 @@ defmodule MoorlandWeb.ScriptLive.Schedule do
         @can_edit && "cursor-grab active:cursor-grabbing"
       ]}
     >
-      <span class="font-semibold uppercase tracking-wider">End of day {@row.day}</span>
+      <.link
+        navigate={~p"/scripts/#{@script_id}/schedule/day/#{@row.day}"}
+        class="font-semibold uppercase tracking-wider underline-offset-2 hover:underline"
+        title="Open this day's call sheet"
+      >
+        End of day {@row.day}
+      </.link>
       <span class="tabular-nums opacity-80">
         {@row.scenes} {if @row.scenes == 1, do: "scene", else: "scenes"} · {eighths(@row.eighths)} pg
       </span>
