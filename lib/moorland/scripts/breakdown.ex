@@ -69,6 +69,57 @@ defmodule Moorland.Scripts.Breakdown do
     end
   end
 
+  @doc """
+  The breakdown as CSV, one row per element per scene, for spreadsheets and
+  scheduling software. Scenes with nothing in them still get a row, so the
+  file lists every scene.
+  """
+  def to_csv(%{scenes: scenes}) do
+    header = ["Scene", "Heading", "INT/EXT", "Time", "Pages (eighths)", "Category", "Element"]
+
+    rows =
+      Enum.flat_map(scenes, fn scene ->
+        base = [
+          scene.number,
+          scene.heading,
+          int_ext_text(scene.int_ext),
+          scene.time || "",
+          scene.eighths
+        ]
+
+        case sheet_rows(scene.elements) do
+          [] -> [base ++ ["", ""]]
+          elements -> Enum.map(elements, &(base ++ &1))
+        end
+      end)
+
+    Enum.map([header | rows], fn row -> [Enum.map_join(row, ",", &csv_cell/1), "\r\n"] end)
+  end
+
+  defp sheet_rows(elements) do
+    for {category, label} <- BreakdownTag.categories(),
+        entry <- Map.get(elements, category, []),
+        do: [label, entry.name]
+  end
+
+  defp int_ext_text(:int), do: "INT"
+  defp int_ext_text(:ext), do: "EXT"
+  defp int_ext_text(:int_ext), do: "INT/EXT"
+  defp int_ext_text(_), do: ""
+
+  # Quotes where needed, and defuses cells a spreadsheet would run as a
+  # formula: names can come from other installations.
+  defp csv_cell(value) when is_integer(value), do: Integer.to_string(value)
+
+  defp csv_cell(value) do
+    text = to_string(value)
+    text = if String.match?(text, ~r/\A[=+\-@\t\r]/), do: "'" <> text, else: text
+
+    if String.contains?(text, [",", "\"", "\n", "\r"]),
+      do: ~s(") <> String.replace(text, ~s("), ~s("")) <> ~s("),
+      else: text
+  end
+
   @doc "The scene containing a 0-based source line, or nil before the first."
   def scene_at(scenes, line) do
     scenes

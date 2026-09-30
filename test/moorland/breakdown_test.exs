@@ -161,4 +161,34 @@ defmodule Moorland.Scripts.BreakdownTest do
       assert depts["vfx"] == []
     end
   end
+
+  describe "to_csv/1" do
+    defp csv(text, tags),
+      do: text |> Breakdown.build(tags) |> Breakdown.to_csv() |> IO.iodata_to_binary()
+
+    test "one row per element per scene, and a row for empty scenes" do
+      van =
+        tag(%{category: "vehicles", name: "Getaway van", anchor_text: "getaway van", line_no: 15})
+
+      [header | rows] = @script |> csv([van]) |> String.split("\r\n", trim: true)
+
+      assert header == "Scene,Heading,INT/EXT,Time,Pages (eighths),Category,Element"
+      assert "1,INT. BANK VAULT - NIGHT,INT,NIGHT,2,Cast,MAYA" in rows
+      assert "2,EXT. ALLEY - DAY,EXT,DAY,2,Vehicles,Getaway van" in rows
+      assert csv("INT. EMPTY ROOM\n\nSilence.", []) =~ "1,INT. EMPTY ROOM,INT,,1,,\r\n"
+    end
+
+    test "quotes awkward cells and defuses formulas" do
+      tricky =
+        tag(%{category: "props", name: ~s(Sign, "WET"), anchor_text: "crowbar", line_no: 5})
+
+      formula =
+        tag(%{category: "props", name: "=HYPERLINK(1)", anchor_text: "crowbar", line_no: 5})
+
+      out = csv(@script, [tricky, formula])
+
+      assert out =~ ~s(,Props,"Sign, ""WET"""\r\n)
+      assert out =~ ",Props,'=HYPERLINK(1)\r\n"
+    end
+  end
 end

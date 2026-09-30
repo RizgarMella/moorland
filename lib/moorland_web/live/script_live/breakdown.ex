@@ -176,6 +176,14 @@ defmodule MoorlandWeb.ScriptLive.Breakdown do
             <h1 class="text-2xl font-semibold tracking-tight">Breakdown</h1>
             <p class="mt-0.5 truncate text-sm text-base-content/60">{@script.title}</p>
           </div>
+          <a
+            id="breakdown-csv"
+            href={~p"/scripts/#{@script.id}/breakdown.csv"}
+            class="btn btn-ghost btn-sm"
+            title="Download as a spreadsheet (CSV)"
+          >
+            <.icon name="hero-table-cells" class="size-4" /> CSV
+          </a>
           <button
             id="breakdown-print"
             type="button"

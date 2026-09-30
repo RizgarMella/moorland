@@ -72,6 +72,7 @@ defmodule MoorlandWeb.Router do
       live "/contacts", ContactLive.Index, :index
     end
 
+    get "/scripts/:id/breakdown.csv", BreakdownController, :csv
     post "/users/update-password", UserSessionController, :update_password
   end
 

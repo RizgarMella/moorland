@@ -194,4 +194,21 @@ defmodule MoorlandWeb.BreakdownLiveTest do
       assert_push_event(lv, "breakdown_tags", %{tags: [%{text: "red bicycle", category: "props"}]})
     end
   end
+
+  describe "CSV download" do
+    test "downloads the breakdown for members", %{conn: conn, scope: scope, script: script} do
+      tag(scope, script, "props", "Bicycle", "red bicycle", 2)
+      conn = get(conn, ~p"/scripts/#{script.id}/breakdown.csv")
+
+      assert response_content_type(conn, :csv) =~ "text/csv"
+      assert get_resp_header(conn, "content-disposition") |> hd() =~ "Ride%20-%20breakdown.csv"
+      assert response(conn, 200) =~ "1,INT. GARAGE - NIGHT,INT,NIGHT,2,Props,Bicycle"
+    end
+
+    test "is not found for strangers", %{script: script} do
+      conn = build_conn() |> log_in_user(user_fixture())
+
+      assert_error_sent 404, fn -> get(conn, ~p"/scripts/#{script.id}/breakdown.csv") end
+    end
+  end
 end
