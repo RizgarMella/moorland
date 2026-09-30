@@ -122,8 +122,9 @@ Moorland installations link to each other directly.
   appears on their Scripts page and stays in sync from then on. Edits from
   both sides merge, the same way they do between collaborators on one
   install.
-- **Comments, notes and history travel too.** Threads, resolutions, notes and
-  named snapshots sync in both directions. Authors on other installations are
+- **Comments, notes and history travel too.** Threads, resolutions, notes,
+  named snapshots, breakdown tags and the stripboard sync in both
+  directions. Authors on other installations are
   shown by name with a small "via peer" mark.
 - **Private by construction.** Everything between installations is end to
   end encrypted and signed. Only peers you have added are served, and nothing

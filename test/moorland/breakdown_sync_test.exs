@@ -206,4 +206,134 @@ defmodule Moorland.BreakdownSyncTest do
     assert {:error, :read_only} = Scripts.peer_apply_activity(peer_key(), ctx.origin.id, payload)
     assert Scripts.list_breakdown_tags(ctx.origin) == []
   end
+
+  describe "stripboard" do
+    @board_content "INT. HALL - DAY\n\nA brass lamp glows.\n\nEXT. PORCH - NIGHT\n\nRain."
+
+    setup ctx do
+      {:ok, origin} = Scripts.save_content(ctx.alice, ctx.origin, @board_content)
+      {:ok, mirror} = Scripts.apply_origin_content(ctx.mirror, origin.title, @board_content, 1)
+      %{origin: origin, mirror: mirror}
+    end
+
+    defp board(script) do
+      script
+      |> Scripts.list_schedule_items()
+      |> Enum.map(fn i -> {i.kind, i.heading, i.note} end)
+    end
+
+    defp mirror_script(ctx), do: Moorland.Repo.get!(Moorland.Scripts.Script, ctx.mirror.id)
+
+    test "the origin's board arrives on the mirror, dates and calls included", ctx do
+      {:ok, _} =
+        Scripts.schedule_scene(ctx.alice, ctx.origin, %{heading: "EXT. PORCH - NIGHT", line_no: 4})
+
+      {:ok, day} = Scripts.add_day_break(ctx.alice, ctx.origin)
+
+      {:ok, _} =
+        Scripts.update_day_break(ctx.alice, ctx.origin, day.id, %{
+          "shoot_date" => "2026-10-12",
+          "note" => "Night",
+          "crew_call" => "17:00",
+          "cast_calls" => %{"ANNA" => "18:00"}
+        })
+
+      pull(ctx.mirror, ctx.origin)
+
+      assert board(ctx.mirror) == [{"scene", "EXT. PORCH - NIGHT", nil}, {"day", nil, "Night"}]
+      [_, mirrored] = Scripts.list_schedule_items(ctx.mirror)
+
+      assert %{shoot_date: ~D[2026-10-12], crew_call: "17:00", cast_calls: %{"ANNA" => "18:00"}} =
+               mirrored
+
+      # Reordered and trimmed at the origin, the mirror follows.
+      [strip, _] = Scripts.list_schedule_items(ctx.origin)
+      :ok = Scripts.remove_schedule_item(ctx.alice, ctx.origin, strip.id)
+      pull(ctx.mirror, ctx.origin)
+      assert board(ctx.mirror) == [{"day", nil, "Night"}]
+    end
+
+    test "an editor's board on the mirror pushes to the origin", ctx do
+      {:ok, _} =
+        Scripts.schedule_scene(ctx.bob, ctx.mirror, %{heading: "INT. HALL - DAY", line_no: 0})
+
+      {:ok, _} = Scripts.add_day_break(ctx.bob, ctx.mirror, %{note: "Day one"})
+
+      refute Activity.empty?(Activity.pending(mirror_script(ctx)))
+      assert {:ok, _} = push(mirror_script(ctx), ctx.origin)
+      assert Activity.empty?(Activity.pending(mirror_script(ctx)))
+
+      assert board(ctx.origin) == [{"scene", "INT. HALL - DAY", nil}, {"day", nil, "Day one"}]
+
+      # And it comes back unchanged, uids intact.
+      uids = Enum.map(Scripts.list_schedule_items(ctx.mirror), & &1.uid)
+      pull(mirror_script(ctx), ctx.origin)
+      assert Enum.map(Scripts.list_schedule_items(ctx.mirror), & &1.uid) == uids
+    end
+
+    test "a pull does not overwrite a board still waiting to be pushed", ctx do
+      {:ok, _} =
+        Scripts.schedule_scene(ctx.alice, ctx.origin, %{heading: "EXT. PORCH - NIGHT", line_no: 4})
+
+      {:ok, _} =
+        Scripts.schedule_scene(ctx.bob, ctx.mirror, %{heading: "INT. HALL - DAY", line_no: 0})
+
+      pull(mirror_script(ctx), ctx.origin)
+      assert board(ctx.mirror) == [{"scene", "INT. HALL - DAY", nil}]
+
+      # Once pushed, the mirror's board is the board everywhere.
+      {:ok, _} = push(mirror_script(ctx), ctx.origin)
+      pull(mirror_script(ctx), ctx.origin)
+      assert board(ctx.origin) == [{"scene", "INT. HALL - DAY", nil}]
+      assert board(ctx.mirror) == board(ctx.origin)
+    end
+
+    test "an origin that sends no board leaves the mirror's alone", ctx do
+      {:ok, _} =
+        Scripts.schedule_scene(ctx.alice, ctx.origin, %{heading: "EXT. PORCH - NIGHT", line_no: 4})
+
+      mirror = pull(ctx.mirror, ctx.origin)
+
+      {:ok, data} = Scripts.peer_activity(peer_key(), ctx.origin.id, 0)
+      {:ok, _} = Activity.apply_from_origin(mirror, data |> wire() |> Map.delete("schedule"))
+      assert board(ctx.mirror) == [{"scene", "EXT. PORCH - NIGHT", nil}]
+    end
+
+    test "viewer mirrors cannot change the board", ctx do
+      :ok = Scripts.set_peer_share(ctx.alice, ctx.origin, ctx.peer.id, "viewer")
+      payload = %{"schedule" => [%{"uid" => "x", "kind" => "day"}]}
+
+      assert {:error, :read_only} =
+               Scripts.peer_apply_activity(peer_key(), ctx.origin.id, payload)
+
+      assert board(ctx.origin) == []
+    end
+
+    test "malformed board items from a peer are skipped", ctx do
+      payload = %{
+        "schedule" => [
+          %{"uid" => "a", "kind" => "scene", "heading" => "INT. HALL - DAY", "line_no" => 0},
+          %{"uid" => "b", "kind" => "scene", "heading" => nil},
+          %{"uid" => "c", "kind" => "day", "crew_call" => "late"},
+          %{"uid" => "d", "kind" => "meeting"},
+          %{"kind" => "day"},
+          %{"uid" => "a", "kind" => "day"},
+          %{"uid" => "e", "kind" => "day", "cast_calls" => %{"ANNA" => "07:00", "BEN" => "x"}}
+        ]
+      }
+
+      {:ok, _} = Scripts.peer_apply_activity(peer_key(), ctx.origin.id, payload)
+
+      assert [%{uid: "a", kind: "scene", position: 0}, %{uid: "e", cast_calls: calls}] =
+               Scripts.list_schedule_items(ctx.origin)
+
+      assert calls == %{"ANNA" => "07:00"}
+    end
+
+    test "the activity stamp moves when the board changes", ctx do
+      before = Activity.stamp(ctx.origin.id)
+      {:ok, _} = Scripts.add_day_break(ctx.alice, ctx.origin)
+      refute Activity.stamp(ctx.origin.id) == before
+    end
+  end
 end

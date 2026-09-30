@@ -153,8 +153,12 @@ it wrote; the origin's owner can delete anything and the next pull follows.
   the remembered line, then by location, so a DAY→NIGHT rewrite keeps its
   strip; cast numbered by size of part; day totals in eighths. Drag and
   drop from Unscheduled and within the board, arrows for touch and
-  keyboard; edit rights to change it. Left: peer sync of the board, and
-  call sheets, which read straight off it.
+  keyboard; edit rights to change it. The board syncs between installs as
+  a whole (`Activity.replace_schedule`): the origin's replaces a mirror's
+  on pull unless the mirror has unpushed changes (`schedule_rev` /
+  `schedule_synced_rev` on Script), and an editor mirror's push replaces
+  the origin's, last push wins. Left: per-item merging if two people
+  schedule at once turns out to matter.
 - **Shot lists & storyboards** [production] — per-scene shot tables created by
   highlighting a script line; storyboard images and mood boards stored in the
   data folder.
@@ -173,9 +177,10 @@ it wrote; the origin's owner can delete anything and the next pull follows.
   `/scripts/:id/schedule/day/:n`, printable: crew/shooting call, location
   and per-cast calls stored on the day's break, scenes with synopses, cast
   with DOOD status and actors from the viewer's Contacts by role,
-  department needs from the breakdown, advance schedule. Left: map and
-  weather (need the network), attachments, and distribution with
-  received/confirmed tracking, which waits on peer sync of the schedule.
+  department needs from the breakdown, advance schedule; they reach every
+  peer the script is shared with, since the board syncs. Left: map and
+  weather (need the network), attachments, and received/confirmed
+  tracking.
 
 ## Tier 4 — Epic (multi-week, architectural)
 

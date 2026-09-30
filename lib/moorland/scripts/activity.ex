@@ -21,6 +21,11 @@ defmodule Moorland.Scripts.Activity do
   Breakdown tags travel like notes. An origin from before tags existed sends
   no `"tags"` list at all, and a mirror then leaves its tags alone rather
   than reading the silence as "all deleted".
+
+  The stripboard travels as a whole board: the origin's replaces a mirror's
+  on every pull, unless the mirror has changes of its own still to push;
+  a mirror's push replaces the origin's (the last push wins, which suits a
+  board kept by one person at a time).
   """
 
   import Ecto.Query, warn: false
@@ -28,7 +33,7 @@ defmodule Moorland.Scripts.Activity do
   alias Moorland.Repo
   alias Moorland.Peers.Peer
   alias Moorland.Scripts
-  alias Moorland.Scripts.{BreakdownTag, Comment, Note, Script, Version}
+  alias Moorland.Scripts.{BreakdownTag, Comment, Note, ScheduleItem, Script, Version}
 
   # Mirrors push named snapshots and restore points; automatic snapshots are
   # local noise (the origin lays down its own on every merged save).
@@ -64,11 +69,20 @@ defmodule Moorland.Scripts.Activity do
         )
       )
 
+    {item_count, item_max} =
+      Repo.one(
+        from(i in ScheduleItem,
+          where: i.script_id == ^script_id,
+          select: {count(i.id), max(i.updated_at)}
+        )
+      )
+
     version_max =
       Repo.one(from(v in Version, where: v.script_id == ^script_id, select: max(v.id)))
 
     "c#{comment_count}@#{stamp_part(comment_max)}|n#{note_count}@#{stamp_part(note_max)}" <>
-      "|t#{tag_count}@#{stamp_part(tag_max)}|v#{version_max || 0}"
+      "|t#{tag_count}@#{stamp_part(tag_max)}|s#{item_count}@#{stamp_part(item_max)}" <>
+      "|v#{version_max || 0}"
   end
 
   @doc "All comments and notes, plus versions after `after_id`, for a peer that may see the script."
@@ -116,6 +130,7 @@ defmodule Moorland.Scripts.Activity do
       comments: Enum.map(comments, &comment_payload/1),
       notes: Enum.map(notes, &note_payload/1),
       tags: Enum.map(tags, &tag_payload/1),
+      schedule: schedule_payload(script.id),
       versions: Enum.map(versions, &version_payload/1)
     }
   end
@@ -184,6 +199,15 @@ defmodule Moorland.Scripts.Activity do
       announce(script, comments? or comments_deleted?, notes? or notes_deleted?, versions?)
 
     changed = announce_tags(script, tags? or tags_deleted?) or changed
+
+    changed =
+      case payload["schedule"] do
+        items when is_list(items) ->
+          announce_schedule(script, replace_schedule(script, items)) or changed
+
+        _ ->
+          changed
+      end
 
     if changed, do: Scripts.nudge_peers(script)
     :ok
@@ -258,11 +282,14 @@ defmodule Moorland.Scripts.Activity do
         )
       )
 
+    schedule_rev = pending_schedule_rev(mirror.id)
+
     %{
       payload: %{
         comments: Enum.map(comments, &comment_payload/1),
         notes: Enum.map(notes, &note_payload/1),
         tags: Enum.map(tags, &tag_payload/1),
+        schedule: if(schedule_rev, do: schedule_payload(mirror.id)),
         versions: Enum.map(versions, &version_payload/1),
         deletions: Enum.map(deletions, &Map.take(&1, [:kind, :uid]))
       },
@@ -270,6 +297,7 @@ defmodule Moorland.Scripts.Activity do
         comments: Enum.map(comments, &{&1.id, &1.rev}),
         notes: Enum.map(notes, &{&1.id, &1.rev}),
         tags: Enum.map(tags, &{&1.id, &1.rev}),
+        schedule: if(schedule_rev, do: {mirror.id, schedule_rev}),
         versions: Enum.map(versions, & &1.id),
         deletions: Enum.map(deletions, & &1.id)
       }
@@ -277,8 +305,21 @@ defmodule Moorland.Scripts.Activity do
   end
 
   def empty?(%{payload: p}) do
-    p.comments == [] and p.notes == [] and p.tags == [] and p.versions == [] and
-      p.deletions == []
+    p.comments == [] and p.notes == [] and p.tags == [] and p.schedule == nil and
+      p.versions == [] and p.deletions == []
+  end
+
+  # The mirror's board revision if it has changes the origin hasn't had.
+  defp pending_schedule_rev(script_id) do
+    case Repo.one(
+           from(s in Script,
+             where: s.id == ^script_id,
+             select: {s.schedule_rev, s.schedule_synced_rev}
+           )
+         ) do
+      {rev, synced} when rev > synced -> rev
+      _ -> nil
+    end
   end
 
   @doc "After the origin accepted a push: everything unchanged since is now in sync."
@@ -296,6 +337,11 @@ defmodule Moorland.Scripts.Activity do
     for {id, rev} <- Map.get(receipt, :tags, []) do
       from(t in BreakdownTag, where: t.id == ^id and t.rev == ^rev)
       |> Repo.update_all(set: [synced_rev: rev])
+    end
+
+    with {script_id, rev} <- Map.get(receipt, :schedule) do
+      from(s in Script, where: s.id == ^script_id)
+      |> Repo.update_all(set: [schedule_synced_rev: rev])
     end
 
     now = DateTime.utc_now(:second)
@@ -397,6 +443,14 @@ defmodule Moorland.Scripts.Activity do
         end
       end)
 
+    schedule? =
+      with items when is_list(items) <- data["schedule"],
+           nil <- pending_schedule_rev(mirror.id) do
+        replace_schedule(mirror, items)
+      else
+        _ -> false
+      end
+
     {:ok, mirror} =
       mirror
       |> Ecto.Changeset.change(origin_activity_stamp: to_string(data["stamp"] || ""))
@@ -404,6 +458,7 @@ defmodule Moorland.Scripts.Activity do
 
     announce(mirror, comments? or comments_gone?, notes? or notes_gone?, versions?)
     announce_tags(mirror, tags?)
+    announce_schedule(mirror, schedule?)
     {:ok, mirror}
   end
 
@@ -603,6 +658,69 @@ defmodule Moorland.Scripts.Activity do
     count > 0
   end
 
+  # Makes the script's board exactly `items`, in order: matching by uid,
+  # updating what changed, adding what is new and dropping what is gone.
+  # Items that fail the same checks as a local edit are skipped.
+  defp replace_schedule(script, items) do
+    existing = Repo.all(from(i in ScheduleItem, where: i.script_id == ^script.id))
+    by_uid = Map.new(existing, &{&1.uid, &1})
+
+    changesets =
+      items
+      |> Enum.filter(&(is_map(&1) and is_binary(&1["uid"]) and &1["uid"] != ""))
+      |> Enum.uniq_by(& &1["uid"])
+      |> Enum.take(2_000)
+      |> Enum.with_index()
+      |> Enum.map(fn {item, position} ->
+        record =
+          Map.get(by_uid, item["uid"], %ScheduleItem{script_id: script.id, uid: item["uid"]})
+
+        schedule_changeset(record, item, position)
+      end)
+      |> Enum.filter(&(&1 && &1.valid?))
+
+    kept = MapSet.new(changesets, &Ecto.Changeset.get_field(&1, :uid))
+    gone = Enum.reject(existing, &MapSet.member?(kept, &1.uid))
+    changed = Enum.filter(changesets, &(&1.data.id == nil or &1.changes != %{}))
+
+    Repo.transaction(fn ->
+      Enum.each(gone, &Repo.delete!/1)
+      Enum.each(changed, &Repo.insert_or_update!/1)
+    end)
+
+    gone != [] or changed != []
+  end
+
+  defp schedule_changeset(record, %{"kind" => "scene"} = item, position) do
+    ScheduleItem.scene_changeset(record, %{
+      heading: clip(item["heading"], 200),
+      line_no:
+        if(is_integer(item["line_no"]) and item["line_no"] >= 0, do: item["line_no"], else: 0),
+      position: position
+    })
+  end
+
+  defp schedule_changeset(record, %{"kind" => "day"} = item, position) do
+    ScheduleItem.day_changeset(record, %{
+      "position" => position,
+      "shoot_date" => item["shoot_date"],
+      "note" => item["note"],
+      "crew_call" => item["crew_call"],
+      "shooting_call" => item["shooting_call"],
+      "location" => item["location"],
+      "cast_calls" => if(is_map(item["cast_calls"]), do: item["cast_calls"], else: %{})
+    })
+  end
+
+  defp schedule_changeset(_record, _item, _position), do: nil
+
+  defp announce_schedule(script, true) do
+    Scripts.broadcast(script.id, {:schedule_changed, script.id})
+    true
+  end
+
+  defp announce_schedule(_script, false), do: false
+
   defp announce_tags(script, true) do
     Scripts.broadcast(script.id, {:breakdown_changed, script.id})
     true
@@ -641,6 +759,28 @@ defmodule Moorland.Scripts.Activity do
       author: handle(n),
       inserted_at: iso(n.inserted_at)
     }
+  end
+
+  defp schedule_payload(script_id) do
+    from(i in ScheduleItem,
+      where: i.script_id == ^script_id,
+      order_by: [asc: i.position, asc: i.id]
+    )
+    |> Repo.all()
+    |> Enum.map(fn i ->
+      %{
+        uid: i.uid,
+        kind: i.kind,
+        heading: i.heading,
+        line_no: i.line_no,
+        shoot_date: i.shoot_date && Date.to_iso8601(i.shoot_date),
+        note: i.note,
+        crew_call: i.crew_call,
+        shooting_call: i.shooting_call,
+        location: i.location,
+        cast_calls: i.cast_calls
+      }
+    end)
   end
 
   defp tag_payload(t) do

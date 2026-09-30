@@ -742,7 +742,7 @@ defmodule Moorland.Scripts do
         end)
 
       {count, _} = Repo.insert_all(ScheduleItem, rows)
-      if count > 0, do: broadcast(script.id, {:schedule_changed, script.id})
+      if count > 0, do: schedule_changed(script)
       {:ok, count}
     end
   end
@@ -786,7 +786,7 @@ defmodule Moorland.Scripts do
     with :ok <- authorize(scope, script, :edit),
          %ScheduleItem{} = item <- get_schedule_item(script, item_id) do
       Repo.delete(item)
-      broadcast(script.id, {:schedule_changed, script.id})
+      schedule_changed(script)
       :ok
     else
       nil -> {:error, :not_found}
@@ -841,7 +841,7 @@ defmodule Moorland.Scripts do
         end)
       end)
 
-      broadcast(script.id, {:schedule_changed, script.id})
+      schedule_changed(script)
       :ok
     end
   end
@@ -859,11 +859,21 @@ defmodule Moorland.Scripts do
   end
 
   defp tap_schedule({:ok, _} = result, script) do
-    broadcast(script.id, {:schedule_changed, script.id})
+    schedule_changed(script)
     result
   end
 
   defp tap_schedule(result, _script), do: result
+
+  # On a mirror a local change marks the board as still to push.
+  defp schedule_changed(%Script{} = script) do
+    if script.origin_public_key do
+      from(s in Script, where: s.id == ^script.id) |> Repo.update_all(inc: [schedule_rev: 1])
+    end
+
+    broadcast(script.id, {:schedule_changed, script.id})
+    nudge_peers(script)
+  end
 
   defp stringify(attrs), do: Map.new(attrs, fn {k, v} -> {to_string(k), v} end)
 

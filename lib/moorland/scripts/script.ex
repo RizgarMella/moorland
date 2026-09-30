@@ -16,6 +16,8 @@ defmodule Moorland.Scripts.Script do
     field :origin_content, :string
     field :origin_role, :string
     field :origin_activity_stamp, :string
+    field :schedule_rev, :integer, default: 0
+    field :schedule_synced_rev, :integer, default: 0
 
     belongs_to :owner, Moorland.Accounts.User
     has_many :collaborators, Moorland.Scripts.Collaborator
