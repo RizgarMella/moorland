@@ -16,7 +16,7 @@ defmodule Moorland.Scripts.Names do
 
   @doc "Names, most used first: `[%{name, count}]`."
   def harvest(text) do
-    occ = occurrences(text || "")
+    occ = text |> Moorland.Scripts.FrontMatter.body() |> occurrences()
 
     {lower, mid, total} =
       Enum.reduce(occ, {MapSet.new(), %{}, %{}}, fn o, {lower, mid, total} ->

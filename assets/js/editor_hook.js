@@ -21,7 +21,7 @@ import {
 import { fountainToFdx } from "./fdx"
 import { applyUI, autoHideHeader, typewriterOn } from "./ui_prefs"
 import { markTags } from "./breakdown_marks"
-import { renderProse, proseNavList } from "./prose"
+import { renderProse, proseNavList, FRONT_MATTER_TEMPLATE } from "./prose"
 import { harvestNames, suggestNames } from "./prose_names"
 import { changedLines, markRevisions, labelRevisedPages } from "./revisions"
 
@@ -685,7 +685,7 @@ export const ScreenplayEditor = {
       this.preview.classList.toggle("prose-doc", this.prose)
       this.preview.classList.toggle("podcast-doc", this.el.dataset.kind === "podcast")
       this.preview.innerHTML = this.prose
-        ? renderProse(this.textarea.value)
+        ? renderProse(this.textarea.value, { helpers: this.canEdit })
         : renderHtml(this.textarea.value, { helpers: this.canEdit, locks: this.locks() })
       markTags(this.preview, this.breakdownTags)
       this.markRevised(this.preview)
@@ -813,6 +813,13 @@ export const ScreenplayEditor = {
     if (typoChip) {
       e.preventDefault()
       this.fixTypo(parseInt(typoChip.dataset.line, 10), typoChip.dataset.from, typoChip.dataset.to)
+      return
+    }
+    if (e.target.closest(".fp-add-front")) {
+      e.preventDefault()
+      this.replaceRange(0, 0, FRONT_MATTER_TEMPLATE)
+      // Cursor after "title: " so the writer can type straight away.
+      this.textarea.setSelectionRange(11, 11)
       return
     }
     const titleChip = e.target.closest(".fp-add-title") || e.target.closest(".fp-edit-title")

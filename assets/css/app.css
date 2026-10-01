@@ -908,6 +908,35 @@ body.mo-typewriter [data-typewriter] {
   font-style: italic;
 }
 
+.prose-doc .pr-front {
+  margin: 1rem 0 4rem;
+  text-align: center;
+}
+
+.prose-doc .pr-title {
+  font-size: 2em;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.prose-doc .pr-author {
+  margin-top: 0.75rem;
+  color: var(--muted);
+}
+
+.prose-doc .pr-dedication,
+.prose-doc .pr-epigraph {
+  margin-top: 2.5rem;
+  font-style: italic;
+}
+
+@media print {
+  .print-screenplay.prose-doc .pr-front {
+    break-after: page;
+    margin-top: 3in;
+  }
+}
+
 .prose-doc .pr-empty {
   color: var(--muted);
   font-style: italic;

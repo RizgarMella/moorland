@@ -5,6 +5,8 @@
 // a sentence and never written in lower case: "Marchbanks" qualifies, "When"
 // (sometimes "when") does not. Pure functions, unit-tested.
 
+import { withoutFrontMatter } from "./prose"
+
 const TITLES = ["Mr", "Mrs", "Ms", "Mx", "Dr", "Prof", "St", "Sr", "Jr", "Capt", "Sgt", "Lt", "Col", "Rev"]
 const TITLE_RE = new RegExp(`^(${TITLES.join("|")})\\.?$`)
 // Capitalised for grammar's sake, never names.
@@ -37,7 +39,7 @@ function sentenceInitial(line, index, prevWord) {
 // "Chapter One" is not a cast list.
 function occurrences(text) {
   const out = []
-  stripBoneyard(text || "")
+  stripBoneyard(withoutFrontMatter(text))
     .split("\n")
     .forEach((line, lineNo) => {
       if (/^\s*#/.test(line)) return

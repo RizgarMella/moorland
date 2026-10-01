@@ -8,6 +8,33 @@ import { escapeHtml, inline } from "./fountain"
 const HEADING_RE = /^(#{1,3})\s+(.*)$/
 const BREAK_RE = /^\s*(([*\-_])\s*){3,}$/
 
+// Front matter: `key: value` lines between `---` lines at the very top.
+// Returns {fields, end} where `end` is the closing line (or -1 if none).
+export function frontMatter(text) {
+  const lines = (text || "").split("\n")
+  if ((lines[0] || "").trim() !== "---") return { fields: {}, end: -1 }
+  const close = lines.slice(1, 41).findIndex((l) => l.trim() === "---")
+  if (close === -1) return { fields: {}, end: -1 }
+  const fields = {}
+  for (const line of lines.slice(1, close + 1)) {
+    const m = line.match(/^\s*([A-Za-z][A-Za-z ]*?)\s*:\s*(.*)$/)
+    if (m && m[2].trim() !== "") fields[m[1].toLowerCase()] = m[2].trim()
+  }
+  return { fields, end: close + 1 }
+}
+
+// The text with its front matter blanked, line numbers kept.
+export function withoutFrontMatter(text) {
+  const { end } = frontMatter(text)
+  if (end < 0) return text || ""
+  const lines = text.split("\n")
+  for (let i = 0; i <= end; i++) lines[i] = ""
+  return lines.join("\n")
+}
+
+export const FRONT_MATTER_TEMPLATE =
+  "---\ntitle: \nauthor: \ncontact: \ndedication: \nepigraph: \n---\n\n"
+
 // Blanks out /* boneyard */ while keeping line numbers.
 function stripBoneyard(text) {
   return text.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ""))
@@ -15,7 +42,7 @@ function stripBoneyard(text) {
 
 // Blocks in order: {type: "heading"|"break"|"quote"|"para", level, text, line}.
 export function parseProse(text) {
-  const lines = stripBoneyard(text || "").split("\n")
+  const lines = stripBoneyard(withoutFrontMatter(text)).split("\n")
   const blocks = []
   let para = null
 
@@ -55,8 +82,21 @@ export function parseProse(text) {
   return blocks
 }
 
-export function renderProse(text) {
+export function renderProse(text, opts = {}) {
   const parts = []
+  const { fields } = frontMatter(text)
+  if (fields.title || fields.author || fields.dedication || fields.epigraph) {
+    parts.push('<div class="pr-front" data-line="0">')
+    if (fields.title) parts.push(`<div class="pr-title">${inline(fields.title)}</div>`)
+    if (fields.author) parts.push(`<div class="pr-author">${inline(fields.author)}</div>`)
+    if (fields.dedication) parts.push(`<div class="pr-dedication">${inline(fields.dedication)}</div>`)
+    if (fields.epigraph) parts.push(`<div class="pr-epigraph">${inline(fields.epigraph)}</div>`)
+    parts.push("</div>")
+  } else if (opts.helpers && (text || "").trim() !== "") {
+    parts.push(
+      '<div class="fp-helper-row"><button class="fp-add-front" title="Add a title, author, contact, dedication and epigraph">+ front matter</button></div>'
+    )
+  }
   for (const block of parseProse(text)) {
     const ln = `data-line="${block.line}"`
     switch (block.type) {

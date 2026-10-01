@@ -14,7 +14,8 @@ defmodule Moorland.Scripts.ProseExport do
 
   @doc "Blocks: `{:heading, level, text}`, `:break`, `{:quote, text}`, `{:para, text}`."
   def blocks(text) do
-    (text || "")
+    text
+    |> Moorland.Scripts.FrontMatter.body()
     |> String.replace(~r/\/\*[\s\S]*?\*\//, "")
     |> String.split("\n")
     |> Enum.chunk_while(
@@ -119,8 +120,23 @@ defmodule Moorland.Scripts.ProseExport do
 
   ## Word
 
-  @doc "A .docx as a binary. `meta`: `%{title, author, contact}`."
+  # Front matter in the text overrides what the caller guessed.
+  defp with_front_matter(text, meta) do
+    {fields, _body} = Moorland.Scripts.FrontMatter.split(text)
+
+    meta
+    |> Map.merge(
+      Map.take(fields, ~w(title author contact))
+      |> Map.new(fn {k, v} -> {String.to_atom(k), v} end)
+    )
+    |> Map.put(:dedication, fields["dedication"])
+    |> Map.put(:epigraph, fields["epigraph"])
+  end
+
+  @doc "A .docx as a binary. `meta`: `%{title, author, contact}`; front matter in the text wins."
   def docx(text, meta) do
+    meta = with_front_matter(text, meta)
+
     files = [
       {~c"[Content_Types].xml", content_types()},
       {~c"_rels/.rels", rels()},
@@ -216,9 +232,16 @@ defmodule Moorland.Scripts.ProseExport do
         _ -> [~s(<w:p><w:r><w:br w:type="page"/></w:r></w:p>) | body]
       end
 
+    # Dedication and epigraph each get a page of their own, set a third of
+    # the way down, centred and single-spaced.
+    extra_pages =
+      for value <- [meta[:dedication], meta[:epigraph]], value do
+        ~s(<w:p><w:pPr><w:pStyle w:val="TitlePage"/><w:pageBreakBefore/><w:spacing w:before="4320"/><w:jc w:val="center"/></w:pPr>#{Enum.map_join(runs(value), "", fn {t, f} -> run(t, %{f | italic: true}) end)}</w:p>)
+      end
+
     ~s(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>
-#{Enum.join(title_page ++ body, "\n")}
+#{Enum.join(title_page ++ extra_pages ++ body, "\n")}
 <w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr>
 </w:body></w:document>)
   end
@@ -245,8 +268,9 @@ defmodule Moorland.Scripts.ProseExport do
 
   ## EPUB
 
-  @doc "An EPUB 3 as a binary. `meta`: `%{title, author, uid}`."
+  @doc "An EPUB 3 as a binary. `meta`: `%{title, author, uid}`; front matter in the text wins."
   def epub(text, meta) do
+    meta = text |> with_front_matter(Map.put_new(meta, :contact, nil))
     chapters = chapters(text)
 
     files =
@@ -255,7 +279,8 @@ defmodule Moorland.Scripts.ProseExport do
         {~c"META-INF/container.xml", container()},
         {~c"OEBPS/content.opf", opf(meta, chapters)},
         {~c"OEBPS/nav.xhtml", nav(meta, chapters)},
-        {~c"OEBPS/style.css", css()}
+        {~c"OEBPS/style.css", css()},
+        {~c"OEBPS/title.xhtml", title_xhtml(meta)}
       ] ++
         for {chapter, i} <- Enum.with_index(chapters, 1) do
           {String.to_charlist("OEBPS/chapter-#{i}.xhtml"), chapter_xhtml(chapter, meta)}
@@ -302,11 +327,16 @@ defmodule Moorland.Scripts.ProseExport do
 
   defp opf(meta, chapters) do
     items =
-      for i <- 1..length(chapters) do
-        ~s(<item id="ch#{i}" href="chapter-#{i}.xhtml" media-type="application/xhtml+xml"/>)
-      end
+      [~s(<item id="title" href="title.xhtml" media-type="application/xhtml+xml"/>)] ++
+        for i <- 1..length(chapters) do
+          ~s(<item id="ch#{i}" href="chapter-#{i}.xhtml" media-type="application/xhtml+xml"/>)
+        end
 
-    spine = for i <- 1..length(chapters), do: ~s(<itemref idref="ch#{i}"/>)
+    spine = [
+      ~s(<itemref idref="title"/>)
+      | for(i <- 1..length(chapters), do: ~s(<itemref idref="ch#{i}"/>))
+    ]
+
     modified = DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
 
     ~s(<?xml version="1.0" encoding="UTF-8"?>
@@ -337,6 +367,19 @@ defmodule Moorland.Scripts.ProseExport do
     xhtml(
       meta.title,
       ~s(<nav epub:type="toc" id="toc"><h1>Contents</h1><ol>#{Enum.join(links)}</ol></nav>)
+    )
+  end
+
+  defp title_xhtml(meta) do
+    extra =
+      for {value, class} <- [{meta[:dedication], "dedication"}, {meta[:epigraph], "epigraph"}],
+          value do
+        ~s(<p class="#{class}">#{inline(value)}</p>)
+      end
+
+    xhtml(
+      meta.title,
+      ~s(<section class="title-page"><h1>#{esc(meta.title)}</h1><p class="byline">#{esc(meta.author)}</p>#{Enum.join(extra)}</section>)
     )
   end
 
@@ -380,6 +423,10 @@ defmodule Moorland.Scripts.ProseExport do
     h1 + p, h2 + p, h3 + p, p.break + p, blockquote + p { text-indent: 0; }
     p.break { text-align: center; margin: 1em 0; text-indent: 0; }
     blockquote { margin: 1em 2em; font-style: italic; }
+    .title-page { text-align: center; margin-top: 30%; }
+    .title-page p { text-indent: 0; }
+    .byline { margin-top: 1em; }
+    .dedication, .epigraph { font-style: italic; margin-top: 3em; }
     """
   end
 end

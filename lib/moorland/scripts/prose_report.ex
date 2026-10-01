@@ -42,7 +42,9 @@ defmodule Moorland.Scripts.ProseReport do
                  chuckled smirked spat bellowed purred)
 
   def analyze(text) do
-    lines = (text || "") |> strip_boneyard() |> String.split("\n")
+    lines =
+      text |> Moorland.Scripts.FrontMatter.body() |> strip_boneyard() |> String.split("\n")
+
     paragraphs = paragraphs(lines)
 
     %{

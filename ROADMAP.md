@@ -301,7 +301,12 @@ ships, and what is still open.
   (title page with contact and rounded word count, 12pt Times, double
   spaced, half-inch indents, chapters on new pages, `#` scene breaks), the
   .epub one XHTML file per chapter with a table of contents; both checked
-  against python-docx and ebooklib. Left: front matter beyond the title. Research (Sep 2026) into what prose needs that
+  against python-docx and ebooklib. *Front matter (Oct 1 2026):* a
+  `---` block of title/author/contact/dedication/epigraph at the top
+  (`Scripts.FrontMatter`, `frontMatter` in prose.js), shown as a title page
+  in the preview (with a "+ front matter" helper), used for the Word title,
+  dedication and epigraph pages and an EPUB title page, and left out of
+  counts, reports and names. Research (Sep 2026) into what prose needs that
   the screenplay editor lacks, with the cost of each:
 
   | Feature | Cost |

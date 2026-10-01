@@ -201,7 +201,8 @@ defmodule Moorland.Scripts.Stats do
   are not words.
   """
   def compute_prose(text) do
-    lines = (text || "") |> strip_boneyard() |> String.split("\n")
+    lines =
+      text |> Moorland.Scripts.FrontMatter.body() |> strip_boneyard() |> String.split("\n")
 
     words =
       lines

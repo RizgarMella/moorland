@@ -52,7 +52,7 @@ defmodule Moorland.Scripts.Pipeline do
   def adapt(prose) do
     {chapters, _} =
       prose
-      |> to_string()
+      |> Moorland.Scripts.FrontMatter.body()
       |> String.replace(~r/\/\*[\s\S]*?\*\//, "")
       |> String.split("\n")
       |> Enum.reduce({[], nil}, &collect/2)
