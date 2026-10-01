@@ -212,9 +212,19 @@ it wrote; the origin's owner can delete anything and the next pull follows.
   the shot list. *Frames sync (Oct 1 2026):* shots carry their frame's
   name; a mirror fetches frames it lacks with the sealed `media` op and
   sends its own inline with its shots, up to 3 MB each (the peer body
-  limit; bigger frames stay where they were made). Left: mood boards.
+  limit; bigger frames stay where they were made). Mood boards came with
+  the media library (below).
 - **Media library** [production] — shared reference files in the data folder,
   synced to production peers like scripts are.
+  *Shipped (Oct 1 2026):* `/scripts/:id/media`. `MediaItem`s (pictures,
+  PDFs, sound, video up to 50 MB; stored in `media/<script id>/` under a
+  name unique per upload) with title, caption and a mood board name; the
+  page drops files in several at a time, plays sound and video in place,
+  and shows a chosen board as a wall of pictures. Items sync like shots:
+  the origin's files are fetched with the sealed `media` op (now with
+  `kind: "library"`), a mirror's travel inline, files over 3 MB stay where
+  they were added and show as such, and a peer may change or delete only
+  what it added. Left: sharing one file across several scripts.
 - **Production calendar & tasks** [production] — prep/shoot/post timeline and
   a simple assignable task board.
   *Shipped (Oct 1 2026):* `/scripts/:id/production`. `ProductionTask`s

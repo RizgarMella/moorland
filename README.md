@@ -152,6 +152,17 @@ locations, and a dialogue balance line from optional gender tags.
   becomes a storyboard; frames travel to linked installations with their
   shots (up to 3 MB each).
 
+### Media library and mood boards
+
+- **Reference files beside the script.** Drop location photos, costume and
+  prop references, lookbook PDFs, temp tracks and test footage onto a
+  script's Media page, give each a title and a caption, and play or open
+  them in place. Pin pictures to named mood boards, shown large as a
+  wall of images. Anyone with comment access can add files; files up to
+  3 MB travel to every linked installation, and bigger ones stay on the
+  computer they were added on while the rest of the team still sees them
+  listed.
+
 ### Stripboard
 
 - **Every scene as a strip,** coloured the way paper boards are: white for

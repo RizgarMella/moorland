@@ -185,6 +185,14 @@ defmodule MoorlandWeb.ScriptLive.Breakdown do
             <.icon name="hero-video-camera" class="size-4" /><span class="hidden sm:inline">Shots</span>
           </.link>
           <.link
+            id="open-media"
+            navigate={~p"/scripts/#{@script.id}/media"}
+            class="btn btn-ghost btn-sm"
+            title="Reference files and mood boards"
+          >
+            <.icon name="hero-photo" class="size-4" /><span class="hidden sm:inline">Media</span>
+          </.link>
+          <.link
             id="open-production"
             navigate={~p"/scripts/#{@script.id}/production"}
             class="btn btn-ghost btn-sm"

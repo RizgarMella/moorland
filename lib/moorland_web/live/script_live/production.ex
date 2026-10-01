@@ -196,6 +196,14 @@ defmodule MoorlandWeb.ScriptLive.Production do
           >
             <.icon name="hero-calendar-days" class="size-4" /><span class="hidden sm:inline">Stripboard</span>
           </.link>
+          <.link
+            id="open-media"
+            navigate={~p"/scripts/#{@script.id}/media"}
+            class="btn btn-ghost btn-sm"
+            title="Reference files and mood boards"
+          >
+            <.icon name="hero-photo" class="size-4" /><span class="hidden sm:inline">Media</span>
+          </.link>
         </div>
 
         <div class="mt-6 inline-flex items-center gap-0.5 rounded-lg bg-base-200 p-0.5">

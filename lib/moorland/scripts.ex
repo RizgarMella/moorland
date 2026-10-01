@@ -32,6 +32,7 @@ defmodule Moorland.Scripts do
     Schedule,
     ScheduleItem,
     Shot,
+    MediaItem,
     ProductionTask,
     Suggestion,
     CallConfirmation
@@ -916,6 +917,126 @@ defmodule Moorland.Scripts do
 
   defp tap_shots(result, _script), do: result
 
+  ## Media library
+
+  @doc "A production's reference files, newest first."
+  def list_media(%Script{} = script) do
+    from(m in MediaItem,
+      where: m.script_id == ^script.id,
+      order_by: [desc: m.inserted_at, desc: m.id],
+      preload: [:author]
+    )
+    |> Repo.all()
+  end
+
+  @doc "The names of the script's mood boards, A to Z."
+  def media_boards(%Script{} = script) do
+    from(m in MediaItem,
+      where: m.script_id == ^script.id and m.board != "",
+      distinct: true,
+      select: m.board,
+      order_by: m.board
+    )
+    |> Repo.all()
+  end
+
+  @max_media 50_000_000
+
+  def max_media_size, do: @max_media
+
+  @doc """
+  Adds a file to the media library, copied from `source` (an uploaded temp
+  file) into the data folder. Anyone who may comment may add references;
+  files up to 3 MB also reach linked installations (see Activity).
+  """
+  def add_media(%Scope{user: user} = scope, %Script{} = script, source, client_name, attrs \\ %{}) do
+    ext = client_name |> Path.extname() |> String.downcase()
+
+    with :ok <- authorize(scope, script, :comment),
+         true <- Map.has_key?(MediaItem.types(), ext) || {:error, :unsupported},
+         {:ok, %{size: size}} when size <= @max_media <- File.stat(source) do
+      uid = Ecto.UUID.generate()
+      file = "media-#{uid}-#{System.unique_integer([:positive])}#{ext}"
+      dir = Moorland.Storage.media_dir(script.id)
+      File.mkdir_p!(dir)
+      File.cp!(source, Path.join(dir, file))
+
+      title = client_name |> Path.rootname() |> String.slice(0, 200)
+
+      %MediaItem{script_id: script.id, author_id: user.id, uid: uid, file: file, size: size}
+      |> MediaItem.changeset(
+        Map.merge(
+          %{"title" => title, "filename" => String.slice(client_name, 0, 255)},
+          stringify(attrs)
+        )
+      )
+      |> Repo.insert()
+      |> tap_media(script)
+    else
+      {:ok, %File.Stat{}} -> {:error, :too_large}
+      {:error, _} = error -> error
+    end
+  end
+
+  @doc "Changes an item's title, caption or mood board."
+  def update_media(%Scope{} = scope, %Script{} = script, item_id, attrs) do
+    with %MediaItem{} = item <- own_media(scope, script, item_id) do
+      item
+      |> MediaItem.changeset(Map.take(stringify(attrs), ~w(title caption board)))
+      |> Ecto.Changeset.put_change(:rev, item.rev + 1)
+      |> Repo.update()
+      |> tap_media(script)
+    end
+  end
+
+  def delete_media(%Scope{} = scope, %Script{} = script, item_id) do
+    with %MediaItem{} = item <- own_media(scope, script, item_id) do
+      Activity.remember_deletion(script, "media", item)
+      remove_media_file(script, item)
+      Repo.delete(item) |> tap_media(script)
+      :ok
+    end
+  end
+
+  @doc "The file and content type of a library item, for a viewer of the script."
+  def media_file(%Scope{} = scope, %Script{} = script, item_id) do
+    with :ok <- authorize(scope, script, :view),
+         %MediaItem{script_id: sid, file: name} = item when sid == script.id and is_binary(name) <-
+           get_by_id(MediaItem, item_id),
+         path = Path.join(Moorland.Storage.media_dir(script.id), name),
+         true <- File.regular?(path) do
+      {:ok, item, path, MediaItem.content_type(name)}
+    else
+      _ -> {:error, :not_found}
+    end
+  end
+
+  defp remove_media_file(script, %MediaItem{file: name}) when is_binary(name),
+    do: File.rm(Path.join(Moorland.Storage.media_dir(script.id), name))
+
+  defp remove_media_file(_script, _item), do: :ok
+
+  # An item its author, or anyone who may edit the script, may change.
+  defp own_media(%Scope{user: user} = scope, script, item_id) do
+    case get_by_id(MediaItem, item_id) do
+      %MediaItem{script_id: sid} = item when sid == script.id ->
+        if item.author_id == user.id or authorize(scope, script, :edit) == :ok,
+          do: item,
+          else: {:error, :not_allowed}
+
+      _ ->
+        {:error, :not_found}
+    end
+  end
+
+  defp tap_media({:ok, _} = result, script) do
+    broadcast(script.id, {:media_changed, script.id})
+    nudge_peers(script)
+    result
+  end
+
+  defp tap_media(result, _script), do: result
+
   ## Production tasks
 
   def list_tasks(%Script{} = script) do
@@ -1550,6 +1671,18 @@ defmodule Moorland.Scripts do
          %Shot{image: name} when is_binary(name) <-
            Repo.get_by(Shot, script_id: script_id, uid: to_string(shot_uid)),
          {:ok, data} <- File.read(Path.join(Moorland.Storage.media_dir(script_id), name)) do
+      {:ok, %{name: name, data: Base.encode64(data)}}
+    else
+      _ -> {:error, :not_found}
+    end
+  end
+
+  @doc "A media library file for a peer the script is shared with."
+  def peer_library_media(public_key, script_id, uid) do
+    with %PeerShare{} <- peer_share_for(public_key, script_id),
+         %MediaItem{file: name} when is_binary(name) <-
+           Repo.get_by(MediaItem, script_id: script_id, uid: to_string(uid)),
+         {:ok, data} <- Activity.library_bytes(script_id, name) do
       {:ok, %{name: name, data: Base.encode64(data)}}
     else
       _ -> {:error, :not_found}

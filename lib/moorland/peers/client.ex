@@ -39,6 +39,11 @@ defmodule Moorland.Peers.Client do
     call(peer, "media", %{id: origin_script_id, uid: shot_uid})
   end
 
+  @doc "A media library file from the origin: name and base64 data."
+  def fetch_library_media(%Peer{} = peer, origin_script_id, uid) do
+    call(peer, "media", %{id: origin_script_id, uid: uid, kind: "library"})
+  end
+
   @doc "Fire-and-forget 'something changed, sync when you like' ping."
   def notify(%Peer{} = peer), do: call(peer, "notify", %{})
 

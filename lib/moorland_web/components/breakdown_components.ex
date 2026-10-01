@@ -71,6 +71,13 @@ defmodule MoorlandWeb.BreakdownComponents do
             Shots
           </.link>
           <.link
+            id="open-media"
+            navigate={~p"/scripts/#{@script.id}/media"}
+            class="flex items-center gap-1 text-xs text-base-content/60 transition hover:text-base-content"
+          >
+            Media
+          </.link>
+          <.link
             id="open-schedule"
             navigate={~p"/scripts/#{@script.id}/schedule"}
             class="flex items-center gap-1 text-xs text-base-content/60 transition hover:text-base-content"

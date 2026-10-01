@@ -150,12 +150,19 @@ defmodule Moorland.Peers.Sync do
     end
   end
 
-  # Storyboard frames named by the origin but not here yet. One failure
+  # Storyboard frames and library files named by the origin but not here yet. One failure
   # (an origin that has since dropped the frame) does not stop the rest.
   defp fetch_missing_media(peer, mirror) do
     for uid <- Activity.missing_media(mirror) do
       case Client.fetch_media(peer, mirror.origin_script_id, uid) do
         {:ok, reply} -> Activity.store_media(mirror, uid, reply)
+        _ -> :skip
+      end
+    end
+
+    for uid <- Activity.missing_library_media(mirror) do
+      case Client.fetch_library_media(peer, mirror.origin_script_id, uid) do
+        {:ok, reply} -> Activity.store_library_media(mirror, uid, reply)
         _ -> :skip
       end
     end

@@ -62,6 +62,7 @@ lib/moorland/
   scripts/breakdown.ex     Breakdown as pure functions: places tags in scenes
                            by their words, builds scene sheets and departments
   scripts/shot_list.ex     Shot list as pure functions: places and numbers shots
+  scripts/media_item.ex    Media library item: file types, kinds, mood board
   scripts/pipeline.ex      Story-to-script stages, and adapting a story to a script
   scripts/names.ex         Names in prose (mirrors assets/js/prose_names.js)
   scripts/prose_report.ex  Chapter lengths and style pointers for prose
@@ -94,6 +95,7 @@ lib/moorland_web/
                                  drag and drop hook
   live/script_live/call_sheet.ex Printable call sheet for one shoot day
   live/script_live/shots.ex      Shot list
+  live/script_live/media.ex      Media library and mood boards
   live/script_live/production.ex Task board and production calendar
   components/breakdown_components.ex  Breakdown panel and shared pieces
   components/revision_components.ex   Revision chip and History section

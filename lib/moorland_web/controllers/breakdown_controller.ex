@@ -63,6 +63,40 @@ defmodule MoorlandWeb.BreakdownController do
     end
   end
 
+  @doc """
+  A media library file, for anyone who can open the script. Pictures,
+  PDFs, sound and video open in the browser; `?download=1` saves the file
+  under the name it was added with.
+  """
+  def media_file(conn, %{"id" => id, "item_id" => item_id} = params) do
+    scope = conn.assigns.current_scope
+    {script, _role} = Scripts.get_script!(scope, id)
+
+    case Scripts.media_file(scope, script, item_id) do
+      {:ok, item, path, type} ->
+        disposition = if params["download"] == "1", do: "attachment", else: "inline"
+
+        conn
+        |> put_resp_content_type(type, nil)
+        |> put_resp_header(
+          "content-disposition",
+          ~s(#{disposition}; filename="#{download_name(item.filename)}")
+        )
+        |> put_resp_header("cache-control", "private, max-age=86400")
+        |> send_file(200, path)
+
+      {:error, _} ->
+        conn |> put_status(404) |> text("Not found")
+    end
+  end
+
+  defp download_name(name) do
+    case name |> to_string() |> String.replace(~r/[^\p{L}\p{N} _.()-]+/u, "") |> String.trim() do
+      "" -> "file"
+      clean -> clean
+    end
+  end
+
   defp filename(title) do
     case title |> String.replace(~r/[^\p{L}\p{N} _.-]+/u, "") |> String.trim() do
       "" -> "script"

@@ -71,6 +71,14 @@ defmodule MoorlandWeb.PeerApiController do
     end
   end
 
+  defp handle("media", %{"id" => id, "uid" => uid, "kind" => "library"}, peer)
+       when is_integer(id) and is_binary(uid) do
+    case Scripts.peer_library_media(peer.public_key, id, uid) do
+      {:ok, payload} -> {200, payload}
+      {:error, _} -> {404, %{error: "not found"}}
+    end
+  end
+
   defp handle("media", %{"id" => id, "uid" => uid}, peer)
        when is_integer(id) and is_binary(uid) do
     case Scripts.peer_media(peer.public_key, id, uid) do

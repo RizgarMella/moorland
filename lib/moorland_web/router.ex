@@ -69,6 +69,7 @@ defmodule MoorlandWeb.Router do
       live "/scripts/:id", ScriptLive.Editor, :edit
       live "/scripts/:id/breakdown", ScriptLive.Breakdown, :show
       live "/scripts/:id/shots", ScriptLive.Shots, :show
+      live "/scripts/:id/media", ScriptLive.Media, :show
       live "/scripts/:id/production", ScriptLive.Production, :show
       live "/scripts/:id/schedule", ScriptLive.Schedule, :show
       live "/scripts/:id/schedule/day/:day", ScriptLive.CallSheet, :show
@@ -79,6 +80,7 @@ defmodule MoorlandWeb.Router do
     get "/scripts/:id/breakdown.csv", BreakdownController, :csv
     get "/scripts/:id/export/:format", BreakdownController, :prose
     get "/scripts/:id/shots/:shot_id/image", BreakdownController, :shot_image
+    get "/scripts/:id/media/:item_id/file", BreakdownController, :media_file
     post "/users/update-password", UserSessionController, :update_password
   end
 

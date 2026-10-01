@@ -18,7 +18,7 @@ defmodule Moorland.Scripts.Activity do
   Trust on the origin side: a peer may add records and resolve any comment,
   but change or delete only records that arrived from that same peer.
 
-  Breakdown tags, shots and production tasks travel like notes (a peer may
+  Breakdown tags, shots, media library items and production tasks travel like notes (a peer may
   move anyone's task along the board, as it may resolve anyone's comment). An origin from before tags existed sends
   no `"tags"` list at all, and a mirror then leaves its tags alone rather
   than reading the silence as "all deleted".
@@ -42,6 +42,7 @@ defmodule Moorland.Scripts.Activity do
     BreakdownTag,
     CallConfirmation,
     Comment,
+    MediaItem,
     Note,
     ProductionTask,
     RevisionSet,
@@ -118,13 +119,21 @@ defmodule Moorland.Scripts.Activity do
         )
       )
 
+    {media_count, media_max} =
+      Repo.one(
+        from(m in MediaItem,
+          where: m.script_id == ^script_id,
+          select: {count(m.id), max(m.updated_at)}
+        )
+      )
+
     version_max =
       Repo.one(from(v in Version, where: v.script_id == ^script_id, select: max(v.id)))
 
     "c#{comment_count}@#{stamp_part(comment_max)}|n#{note_count}@#{stamp_part(note_max)}" <>
       "|t#{tag_count}@#{stamp_part(tag_max)}|s#{item_count}@#{stamp_part(item_max)}" <>
       "|h#{shot_count}@#{stamp_part(shot_max)}|k#{task_count}@#{stamp_part(task_max)}" <>
-      "|r#{rev_count}@#{stamp_part(rev_max)}" <>
+      "|r#{rev_count}@#{stamp_part(rev_max)}|m#{media_count}@#{stamp_part(media_max)}" <>
       "|v#{version_max || 0}"
   end
 
@@ -174,6 +183,7 @@ defmodule Moorland.Scripts.Activity do
       notes: Enum.map(notes, &note_payload/1),
       tags: Enum.map(tags, &tag_payload/1),
       shots: script.id |> all_shots() |> Enum.map(&shot_payload/1),
+      media: script.id |> all_media() |> Enum.map(&media_payload/1),
       tasks: script.id |> all_tasks() |> Enum.map(&task_payload/1),
       revision_sets: script.id |> all_revision_sets() |> Enum.map(&revision_payload/1),
       page_lock: Repo.one(from(s in Script, where: s.id == ^script.id, select: s.page_lock)),
@@ -244,6 +254,20 @@ defmodule Moorland.Scripts.Activity do
         end
       end)
 
+    media? =
+      Enum.reduce(list(payload, "media"), false, fn item, acc ->
+        case find(MediaItem, script.id, item["uid"]) do
+          nil ->
+            insert_media(script, item, key, :origin) == :ok or acc
+
+          %MediaItem{peer_key: ^key} = existing ->
+            apply_media_fields(existing, item, :origin) or acc
+
+          %MediaItem{} ->
+            acc
+        end
+      end)
+
     tasks? =
       Enum.reduce(list(payload, "tasks"), false, fn item, acc ->
         case find(ProductionTask, script.id, item["uid"]) do
@@ -296,6 +320,18 @@ defmodule Moorland.Scripts.Activity do
           end
 
         cond do
+          item["kind"] == "media" ->
+            # The file goes with the record.
+            case find(MediaItem, script.id, item["uid"]) do
+              %MediaItem{peer_key: ^key} = record ->
+                drop_library_file(script.id, record.file)
+                Repo.delete(record)
+                MapSet.put(deleted, MediaItem)
+
+              _ ->
+                deleted
+            end
+
           item["kind"] == "revision_set" ->
             # Ending revision mode is the whole team's switch: any set goes.
             case find(RevisionSet, script.id, item["uid"]) do
@@ -327,6 +363,7 @@ defmodule Moorland.Scripts.Activity do
     changed = announce_tags(script, tags? or tags_deleted?) or changed
     changed = announce_shots(script, shots? or shots_deleted?) or changed
     changed = announce_tasks(script, tasks? or tasks_deleted?) or changed
+    changed = announce_media(script, media? or MediaItem in deleted) or changed
     changed = announce_revisions(script, revisions? or RevisionSet in deleted) or changed
     if suggestions?, do: Scripts.broadcast(script.id, {:suggestions_changed, script.id})
 
@@ -438,6 +475,15 @@ defmodule Moorland.Scripts.Activity do
         )
       )
 
+    media =
+      Repo.all(
+        from(m in MediaItem,
+          where: m.script_id == ^mirror.id and m.rev > m.synced_rev,
+          order_by: [asc: m.id],
+          preload: [:author]
+        )
+      )
+
     revision_sets =
       Repo.all(
         from(r in RevisionSet,
@@ -465,6 +511,12 @@ defmodule Moorland.Scripts.Activity do
         shots:
           Enum.map(shots, &Map.put(shot_payload(&1), :image_data, shot_image_data(mirror, &1))),
         tasks: Enum.map(tasks, &task_payload/1),
+        # A mirror's own files travel with their records, like frames.
+        media:
+          Enum.map(
+            media,
+            &Map.put(media_payload(&1), :data, library_data(mirror.id, &1.file))
+          ),
         revision_sets: Enum.map(revision_sets, &revision_payload/1),
         call_confirmations: Enum.map(confirmations, &confirmation_payload/1),
         schedule: if(schedule_rev, do: schedule_payload(mirror.id)),
@@ -477,6 +529,7 @@ defmodule Moorland.Scripts.Activity do
         tags: Enum.map(tags, &{&1.id, &1.rev}),
         shots: Enum.map(shots, &{&1.id, &1.rev}),
         tasks: Enum.map(tasks, &{&1.id, &1.rev}),
+        media: Enum.map(media, &{&1.id, &1.rev}),
         revision_sets: Enum.map(revision_sets, & &1.id),
         call_confirmations: Enum.map(confirmations, & &1.id),
         schedule: if(schedule_rev, do: {mirror.id, schedule_rev}),
@@ -488,6 +541,7 @@ defmodule Moorland.Scripts.Activity do
 
   def empty?(%{payload: p}) do
     p.comments == [] and p.notes == [] and p.tags == [] and p.shots == [] and p.tasks == [] and
+      Map.get(p, :media, []) == [] and
       p.revision_sets == [] and p.call_confirmations == [] and p.schedule == nil and
       p.versions == [] and p.deletions == []
   end
@@ -534,6 +588,11 @@ defmodule Moorland.Scripts.Activity do
 
     for {id, rev} <- Map.get(receipt, :tasks, []) do
       from(t in ProductionTask, where: t.id == ^id and t.rev == ^rev)
+      |> Repo.update_all(set: [synced_rev: rev])
+    end
+
+    for {id, rev} <- Map.get(receipt, :media, []) do
+      from(m in MediaItem, where: m.id == ^id and m.rev == ^rev)
       |> Repo.update_all(set: [synced_rev: rev])
     end
 
@@ -668,6 +727,28 @@ defmodule Moorland.Scripts.Activity do
         false
       end
 
+    media? =
+      if is_list(data["media"]) do
+        items = list(data, "media")
+
+        changed? =
+          Enum.reduce(items, false, fn item, acc ->
+            case find(MediaItem, mirror.id, item["uid"]) do
+              nil ->
+                insert_media(mirror, item, key, :mirror) == :ok or acc
+
+              %MediaItem{} = existing ->
+                if pending?(existing),
+                  do: acc,
+                  else: apply_media_fields(existing, item, :mirror) or acc
+            end
+          end)
+
+        delete_missing_media(mirror.id, Enum.map(items, & &1["uid"])) or changed?
+      else
+        false
+      end
+
     tasks? =
       if is_list(data["tasks"]) do
         task_items = list(data, "tasks")
@@ -768,6 +849,7 @@ defmodule Moorland.Scripts.Activity do
     announce_schedule(mirror, schedule?)
     announce_shots(mirror, shots?)
     announce_tasks(mirror, tasks?)
+    announce_media(mirror, media?)
     announce_revisions(mirror, revisions?)
     if confirmations?, do: Scripts.broadcast(mirror.id, {:schedule_changed, mirror.id})
     if page_lock?, do: Scripts.broadcast(mirror.id, {:script_updated, mirror.id})
@@ -1122,6 +1204,178 @@ defmodule Moorland.Scripts.Activity do
   end
 
   def store_media(_mirror, _uid, _reply), do: :skip
+
+  ## Media library files
+  #
+  # Like storyboard frames: a file travels by its stored name, unique per
+  # upload. The origin sends bytes on request (the "media" op with kind
+  # "library"); a mirror sends its own inline with the record. Files over
+  # @max_synced_frame stay where they were added; the record still travels,
+  # so everyone sees the item and where it lives.
+
+  @doc "A library file's bytes, when it is small enough to travel."
+  def library_bytes(script_id, name) do
+    path = Path.join(Moorland.Storage.media_dir(script_id), name)
+
+    with true <- MediaItem.valid_file?(name),
+         {:ok, %{size: size}} when size <= @max_synced_frame <- File.stat(path) do
+      File.read(path)
+    else
+      _ -> {:error, :unavailable}
+    end
+  end
+
+  def max_synced_file, do: @max_synced_frame
+
+  defp library_data(script_id, name) do
+    case library_bytes(script_id, name) do
+      {:ok, bytes} -> Base.encode64(bytes)
+      _ -> nil
+    end
+  end
+
+  defp drop_library_file(script_id, name) do
+    if MediaItem.valid_file?(name),
+      do: File.rm(Path.join(Moorland.Storage.media_dir(script_id), name))
+  end
+
+  defp write_library_file(script_id, item) do
+    with name when is_binary(name) <- item["file"],
+         true <- MediaItem.valid_file?(name),
+         data when is_binary(data) <- item["data"],
+         {:ok, bytes} <- Base.decode64(data),
+         true <- byte_size(bytes) <= @max_synced_frame do
+      dir = Moorland.Storage.media_dir(script_id)
+      File.mkdir_p!(dir)
+      File.write!(Path.join(dir, name), bytes)
+    end
+  end
+
+  @doc "Library items on this mirror whose file has not arrived and could: `[uid]`."
+  def missing_library_media(%Script{} = mirror) do
+    dir = Moorland.Storage.media_dir(mirror.id)
+
+    from(m in MediaItem,
+      where: m.script_id == ^mirror.id and not is_nil(m.file) and m.size <= @max_synced_frame,
+      select: {m.uid, m.file}
+    )
+    |> Repo.all()
+    |> Enum.reject(fn {_uid, name} -> File.exists?(Path.join(dir, name)) end)
+    |> Enum.map(&elem(&1, 0))
+  end
+
+  @doc "Stores a library file fetched from the origin, if it is still the item's file."
+  def store_library_media(%Script{} = mirror, uid, %{"name" => name, "data" => data}) do
+    case find(MediaItem, mirror.id, uid) do
+      %MediaItem{file: ^name} ->
+        if write_library_file(mirror.id, %{"file" => name, "data" => data}) == :ok do
+          Scripts.broadcast(mirror.id, {:media_changed, mirror.id})
+          :ok
+        else
+          :skip
+        end
+
+      _ ->
+        :skip
+    end
+  end
+
+  def store_library_media(_mirror, _uid, _reply), do: :skip
+
+  defp insert_media(script, item, peer_key, side) do
+    with uid when is_binary(uid) <- item["uid"],
+         name when is_binary(name) <- item["file"],
+         true <- MediaItem.valid_file?(name) do
+      %MediaItem{
+        script_id: script.id,
+        uid: uid,
+        file: name,
+        size: if(is_integer(item["size"]) and item["size"] >= 0, do: item["size"], else: 0),
+        remote_author: handle_from(item),
+        peer_key: peer_key,
+        inserted_at: parse_time(item["inserted_at"])
+      }
+      |> MediaItem.changeset(media_attrs(item))
+      |> Ecto.Changeset.change(arrival_changes(side))
+      |> then(&if(&1.valid?, do: Repo.insert(&1, on_conflict: :nothing), else: :skip))
+      |> case do
+        {:ok, %MediaItem{id: id}} when is_integer(id) ->
+          write_library_file(script.id, item)
+          :ok
+
+        _ ->
+          :skip
+      end
+    else
+      _ -> :skip
+    end
+  end
+
+  # The file itself never changes; only what is said about it.
+  defp apply_media_fields(existing, item, side) do
+    changeset = MediaItem.changeset(existing, Map.delete(media_attrs(item), "filename"))
+
+    if changeset.valid? and changeset.changes != %{} do
+      changeset |> Ecto.Changeset.change(update_changes(existing, side)) |> Repo.update!()
+      true
+    else
+      false
+    end
+  end
+
+  defp media_attrs(item) do
+    %{
+      "title" => clip(item["title"], 200),
+      "caption" => clip(item["caption"], 2000),
+      "board" => clip(item["board"], 80),
+      "filename" => clip(item["filename"], 255)
+    }
+  end
+
+  defp delete_missing_media(script_id, uids) do
+    gone =
+      from(m in MediaItem,
+        where: m.script_id == ^script_id and m.synced_rev > 0 and m.uid not in ^uids
+      )
+      |> Repo.all()
+
+    Enum.each(gone, fn item ->
+      drop_library_file(script_id, item.file)
+      Repo.delete(item)
+    end)
+
+    gone != []
+  end
+
+  defp all_media(script_id) do
+    from(m in MediaItem,
+      where: m.script_id == ^script_id,
+      order_by: [asc: m.id],
+      preload: [:author]
+    )
+    |> Repo.all()
+  end
+
+  defp media_payload(m) do
+    %{
+      uid: m.uid,
+      file: m.file,
+      filename: m.filename,
+      title: m.title,
+      caption: m.caption,
+      board: m.board,
+      size: m.size,
+      author: handle(m),
+      inserted_at: iso(m.inserted_at)
+    }
+  end
+
+  defp announce_media(script, true) do
+    Scripts.broadcast(script.id, {:media_changed, script.id})
+    true
+  end
+
+  defp announce_media(_script, false), do: false
 
   defp insert_shot(script, item, peer_key, side) do
     if is_binary(item["uid"]) do

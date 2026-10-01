@@ -196,6 +196,14 @@ defmodule MoorlandWeb.ScriptLive.Shots do
           >
             <.icon name="hero-tag" class="size-4" /><span class="hidden sm:inline">Breakdown</span>
           </.link>
+          <.link
+            id="open-media"
+            navigate={~p"/scripts/#{@script.id}/media"}
+            class="btn btn-ghost btn-sm"
+            title="Reference files and mood boards"
+          >
+            <.icon name="hero-photo" class="size-4" /><span class="hidden sm:inline">Media</span>
+          </.link>
           <button
             type="button"
             onclick="window.print()"
