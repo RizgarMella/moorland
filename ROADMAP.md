@@ -365,7 +365,11 @@ ships, and what is still open.
   (only documents the caller can open) and starts the next stage, a copy to
   grow for prose, `Pipeline.adapt/1` for the script (chapters to sections,
   scenes and breaks to scene stubs with a synopsis and their prose kept in
-  the boneyard). Left: the Characters panel and character specs.
+  the boneyard). *Characters shipped (Oct 1 2026):* a Characters tab in
+  Notes lists everyone in the work (speaking parts in a script; in prose,
+  `Scripts.Names`, the server's copy of the autocomplete name rules) with a
+  sheet each (Role, Age, Wants, Needs, Arc, Notes) stored as a `character`
+  Note, so sheets sync to peers.
 
 ---
 

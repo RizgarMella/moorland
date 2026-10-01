@@ -3,7 +3,7 @@ defmodule Moorland.Scripts.Note do
   import Ecto.Changeset
 
   @colors ~w(yellow blue green pink gray)
-  @kinds ~w(note sketch)
+  @kinds ~w(note sketch character)
 
   schema "notes" do
     field :body, :string

@@ -63,6 +63,7 @@ lib/moorland/
                            by their words, builds scene sheets and departments
   scripts/shot_list.ex     Shot list as pure functions: places and numbers shots
   scripts/pipeline.ex      Story-to-script stages, and adapting a story to a script
+  scripts/names.ex         Names in prose (mirrors assets/js/prose_names.js)
   scripts/schedule.ex      Stripboard as pure functions: matches strips to
                            scenes, numbers cast, totals shoot days, day out
                            of days and call sheets

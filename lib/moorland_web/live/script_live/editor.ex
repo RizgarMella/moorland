@@ -3,6 +3,8 @@ defmodule MoorlandWeb.ScriptLive.Editor do
 
   import MoorlandWeb.BreakdownComponents, only: [breakdown_panel: 1, scene_for_line: 2]
 
+  import MoorlandWeb.CharacterComponents, only: [characters_tab: 1]
+
   import MoorlandWeb.RevisionComponents,
     only: [revision_chip: 1, revision_section: 1, revision_label: 1]
 
@@ -45,6 +47,8 @@ defmodule MoorlandWeb.ScriptLive.Editor do
         tag_draft: nil,
         breakdown: nil,
         notes_kind: "note",
+        characters: [],
+        editing_sheet: nil,
         lineage: if(script.stage, do: Scripts.lineage(scope, script), else: []),
         tags: Scripts.list_breakdown_tags(script),
         revision_sets: Scripts.list_revision_sets(script),
@@ -118,6 +122,17 @@ defmodule MoorlandWeb.ScriptLive.Editor do
         ),
       else: assign(socket, :breakdown, nil)
   end
+
+  # Characters are worked out only while their tab is open.
+  defp load_characters(%{assigns: %{panel: "notes", notes_kind: "character"}} = socket) do
+    assign(
+      socket,
+      :characters,
+      MoorlandWeb.CharacterComponents.rows(socket.assigns.script, socket.assigns.notes)
+    )
+  end
+
+  defp load_characters(socket), do: socket
 
   defp presence_list(script_id) do
     Scripts.topic(script_id)
@@ -277,7 +292,9 @@ defmodule MoorlandWeb.ScriptLive.Editor do
 
   def handle_event("toggle_panel", %{"panel" => panel}, socket) do
     new_panel = if(socket.assigns.panel == panel, do: nil, else: panel)
-    socket = socket |> assign(panel: new_panel, diff: nil) |> build_breakdown()
+
+    socket =
+      socket |> assign(panel: new_panel, diff: nil) |> build_breakdown() |> load_characters()
 
     if new_panel == "comments" do
       Scripts.mark_notifications_read(socket.assigns.current_scope, socket.assigns.script)
@@ -488,7 +505,45 @@ defmodule MoorlandWeb.ScriptLive.Editor do
   end
 
   def handle_event("notes_kind", %{"kind" => kind}, socket) do
-    {:noreply, assign(socket, :notes_kind, if(kind == "sketch", do: "sketch", else: "note"))}
+    kind = if kind in ["sketch", "character"], do: kind, else: "note"
+    {:noreply, socket |> assign(:notes_kind, kind) |> load_characters()}
+  end
+
+  def handle_event("add_sheet", %{"name" => name}, socket) do
+    %{current_scope: scope, script: script} = socket.assigns
+    body = MoorlandWeb.CharacterComponents.sheet_template(name)
+
+    case Scripts.create_note(scope, script, %{body: body, kind: "character", color: "gray"}) do
+      {:ok, note} ->
+        {:noreply,
+         socket |> assign(:editing_sheet, note.id) |> load_panel_data() |> load_characters()}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Could not add that sheet.")}
+    end
+  end
+
+  def handle_event("edit_sheet", %{"id" => id}, socket) do
+    id =
+      case Integer.parse(id) do
+        {n, ""} -> n
+        _ -> nil
+      end
+
+    {:noreply, assign(socket, :editing_sheet, id)}
+  end
+
+  def handle_event("save_sheet", %{"note_id" => id, "body" => body}, socket) do
+    %{current_scope: scope, script: script} = socket.assigns
+
+    case Scripts.update_note(scope, script, id, %{body: body}) do
+      {:ok, _} ->
+        {:noreply,
+         socket |> assign(:editing_sheet, nil) |> load_panel_data() |> load_characters()}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "That sheet couldn't be saved.")}
+    end
   end
 
   def handle_event("script_from_sketch", %{"id" => id}, socket) do
@@ -683,7 +738,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
         do: assign(socket, :stats, Stats.compute_for(socket.assigns.script, content)),
         else: socket
 
-    socket = build_breakdown(socket)
+    socket = socket |> build_breakdown() |> load_characters()
 
     if user_id != socket.assigns.current_scope.user.id do
       {:noreply, push_event(socket, "remote_content", %{content: content, version: version})}
@@ -699,7 +754,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
 
   def handle_info({event, _id}, socket)
       when event in [:comments_changed, :notes_changed, :versions_changed, :collaborators_changed] do
-    {:noreply, load_panel_data(socket)}
+    {:noreply, socket |> load_panel_data() |> load_characters()}
   end
 
   def handle_info({:revisions_changed, _id}, socket) do
@@ -1255,6 +1310,9 @@ defmodule MoorlandWeb.ScriptLive.Editor do
             notes={Enum.filter(@notes, &(&1.kind == @notes_kind))}
             kind={@notes_kind}
             counts={Enum.frequencies_by(@notes, & &1.kind)}
+            characters={@characters}
+            editing_sheet={@editing_sheet}
+            prose={prose?(@script)}
             role={@role}
             current_user_id={@current_scope.user.id}
           />
@@ -1460,6 +1518,9 @@ defmodule MoorlandWeb.ScriptLive.Editor do
   attr :notes, :list, required: true
   attr :kind, :string, required: true
   attr :counts, :map, required: true
+  attr :characters, :list, default: []
+  attr :editing_sheet, :any, default: nil
+  attr :prose, :boolean, default: false
   attr :role, :atom, required: true
   attr :current_user_id, :integer, required: true
 
@@ -1470,7 +1531,13 @@ defmodule MoorlandWeb.ScriptLive.Editor do
         <h2 class="text-sm font-semibold">Notes</h2>
         <div class="flex items-center gap-0.5 rounded-lg bg-base-200 p-0.5" role="tablist">
           <button
-            :for={{kind, label} <- [{"note", "Notes"}, {"sketch", "Sketches"}]}
+            :for={
+              {kind, label} <- [
+                {"note", "Notes"},
+                {"sketch", "Sketches"},
+                {"character", "Characters"}
+              ]
+            }
             id={"notes-tab-#{kind}"}
             type="button"
             role="tab"
@@ -1491,8 +1558,17 @@ defmodule MoorlandWeb.ScriptLive.Editor do
         </div>
       </div>
 
+      <.characters_tab
+        :if={@kind == "character"}
+        rows={@characters}
+        editing={@editing_sheet}
+        role={@role}
+        current_user_id={@current_user_id}
+        prose={@prose}
+      />
+
       <form
-        :if={Scripts.can_comment?(@role)}
+        :if={Scripts.can_comment?(@role) && @kind != "character"}
         id="add-note-form"
         phx-submit="add_note"
         class="border-b border-base-300 px-4 py-3"
@@ -1531,7 +1607,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
         </div>
       </form>
 
-      <div class="space-y-3 p-4">
+      <div :if={@kind != "character"} class="space-y-3 p-4">
         <div
           :for={note <- @notes}
           class={["rounded-lg border p-3 shadow-sm", note_color_class(note.color)]}

@@ -66,6 +66,9 @@ page one.
   stage (short story, story, script), each stage its own document, linked
   in a strip above the editor. Starting the script turns every scene of the
   story into a scene stub with the story's own words kept beside it.
+- **Characters.** The Characters tab in Notes lists everyone in the work,
+  speaking parts or names in the prose, and gives each a sheet (role, age,
+  wants, needs, arc) that travels with the script.
 - **Sketches.** Keep premises, characters and scraps that aren't a script
   yet on the Sketches tab of Notes, and start a new script from one when
   it's ready.
