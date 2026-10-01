@@ -102,6 +102,7 @@ assets/js/
   breakdown_marks.js     Highlights breakdown tags in the preview
   revisions.js           Revision marks: line diff against a set's base (pure)
   prose.js               Markdown renderer and chapter list for prose (pure)
+  prose_names.js         Character and place names harvested from prose (pure)
   fdx.js                 Final Draft import and export
   ui_prefs.js            Distraction free chrome and fullscreen
   importer_hook.js       Dashboard file import

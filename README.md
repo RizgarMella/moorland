@@ -30,7 +30,12 @@ middle. It is free software built on an open format.
 Moorland writes screenplays in Fountain and, for **stories and books**,
 prose in Markdown: chapters (`#`) and scenes (`##`) in the navigator, book
 typography on screen, standard manuscript format in print, and the same
-comments, history, goals, sprints and sync.
+comments, history, goals, sprints and sync. **Names autocomplete** as you
+type: Moorland learns your characters and places from the story itself
+(telling "Marchbanks" from words that are only capitalised because they
+start a sentence), offers full names like "Anna Grey" and "Dr. Okafor",
+and Tab completes them, so a name is spelled the same on page 300 as on
+page one.
 
 - **A real page while you type.** Plain text on the left, an industry
   standard screenplay page on the right: Courier, correct margins, scene

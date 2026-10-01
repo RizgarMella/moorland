@@ -269,7 +269,11 @@ ships, and what is still open.
   lists `#`/`##` headings; Reports shows manuscript pages (≈250 words),
   reading time and chapters (`Stats.compute_prose/1`); print is standard
   manuscript (12pt Times, double-spaced, chapters on new pages); the
-  mirror is `.md`. Left: DOCX/EPUB export, style checks, front matter. Research (Sep 2026) into what prose needs that
+  mirror is `.md`. Prose name autocomplete (`prose_names.js`): a word is a
+  name when it is capitalised mid-sentence and never written in lower
+  case; full names and title + name are offered when seen together twice;
+  Tab completes, Enter stays a new paragraph. Left: DOCX/EPUB export, style
+  checks, front matter. Research (Sep 2026) into what prose needs that
   the screenplay editor lacks, with the cost of each:
 
   | Feature | Cost |

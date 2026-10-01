@@ -20,6 +20,7 @@ import { fountainToFdx } from "./fdx"
 import { applyUI, autoHideHeader, typewriterOn } from "./ui_prefs"
 import { markTags } from "./breakdown_marks"
 import { renderProse, proseNavList } from "./prose"
+import { harvestNames, suggestNames } from "./prose_names"
 import { changedLines, markRevisions } from "./revisions"
 
 const AUTOSAVE_MS = 1200
@@ -1000,6 +1001,14 @@ export const ScreenplayEditor = {
         this.moveSelection(-1)
         break
       case "Enter":
+        // In prose Enter is a new paragraph far more often than a name.
+        if (this.prose) {
+          this.hideMenu()
+          break
+        }
+        e.preventDefault()
+        this.acceptSuggestion(this.suggestions[this.selectedIndex])
+        break
       case "Tab":
         e.preventDefault()
         this.acceptSuggestion(this.suggestions[this.selectedIndex])
@@ -1088,8 +1097,7 @@ export const ScreenplayEditor = {
   },
 
   updateAutocomplete() {
-    if (this.prose) return this.hideMenu()
-    const result = this.computeSuggestions()
+    const result = this.prose ? this.computeNameSuggestions() : this.computeSuggestions()
     if (!result) {
       this.hideMenu()
       return
@@ -1099,6 +1107,31 @@ export const ScreenplayEditor = {
     this.suffix = result.suffix
     this.selectedIndex = 0
     this.showMenu()
+  },
+
+  // Prose: names already used in the story, offered as a capitalised word
+  // is typed anywhere in a line. The word being typed is left out of the
+  // harvest, so half-typed words never become suggestions.
+  computeNameSuggestions() {
+    if (!this.canEdit) return null
+    const ta = this.textarea
+    if (ta.selectionStart !== ta.selectionEnd) return null
+    const after = ta.value.charAt(ta.selectionStart)
+    if (/[\p{L}'’\-]/u.test(after)) return null
+
+    const { lineNo, colBefore } = this.currentLineInfo()
+    const word = colBefore.match(/[\p{L}][\p{L}'’\-]*$/u)
+    if (!word) return null
+
+    const now = Date.now()
+    if (!this.names || now - this.namesAt > 1500) {
+      this.names = harvestNames(ta.value, { line: lineNo, start: colBefore.length - word[0].length })
+      this.namesAt = now
+    }
+
+    const result = suggestNames(this.names, colBefore)
+    if (!result) return null
+    return { items: result.items, replaceFrom: colBefore.length - result.fragment.length, suffix: "" }
   },
 
   showMenu() {
@@ -1113,6 +1146,12 @@ export const ScreenplayEditor = {
       })
       this.menu.appendChild(div)
     })
+    if (this.prose) {
+      const hint = document.createElement("div")
+      hint.className = "autocomplete-hint"
+      hint.textContent = "Tab to complete"
+      this.menu.appendChild(hint)
+    }
     const { top, left } = this.caretCoords()
     this.menu.style.top = `${top + 24}px`
     this.menu.style.left = `${left}px`
