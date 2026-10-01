@@ -279,8 +279,12 @@ ships, and what is still open.
   mirror is `.md`. Prose name autocomplete (`prose_names.js`): a word is a
   name when it is capitalised mid-sentence and never written in lower
   case; full names and title + name are offered when seen together twice;
-  Tab completes, Enter stays a new paragraph. Left: DOCX/EPUB export, style
-  checks, front matter. Research (Sep 2026) into what prose needs that
+  Tab completes, Enter stays a new paragraph. *Style checks and chapter
+  report shipped (Oct 1 2026):* `Scripts.ProseReport` adds to Reports each
+  chapter's words and reading time, echoes (a word three times in a
+  paragraph), -ly adverbs, possible passive voice and plain-versus-showy
+  dialogue tags, each linking to its line. Left: DOCX/EPUB export, front
+  matter. Research (Sep 2026) into what prose needs that
   the screenplay editor lacks, with the cost of each:
 
   | Feature | Cost |

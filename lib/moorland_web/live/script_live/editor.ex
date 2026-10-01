@@ -4,6 +4,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
   import MoorlandWeb.BreakdownComponents, only: [breakdown_panel: 1, scene_for_line: 2]
 
   import MoorlandWeb.CharacterComponents, only: [characters_tab: 1]
+  import MoorlandWeb.ProseReportComponents, only: [prose_report: 1]
 
   import MoorlandWeb.RevisionComponents,
     only: [revision_chip: 1, revision_section: 1, revision_label: 1]
@@ -47,6 +48,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
         tag_draft: nil,
         breakdown: nil,
         notes_kind: "note",
+        prose_report: nil,
         characters: [],
         editing_sheet: nil,
         lineage: if(script.stage, do: Scripts.lineage(scope, script), else: []),
@@ -305,6 +307,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
         do:
           assign(socket,
             stats: Stats.compute_for(socket.assigns.script, socket.assigns.script.content),
+            prose_report: prose_report_for(socket.assigns.script, socket.assigns.script.content),
             char_meta: Scripts.list_character_meta(socket.assigns.script)
           ),
         else: socket
@@ -735,7 +738,11 @@ defmodule MoorlandWeb.ScriptLive.Editor do
 
     socket =
       if socket.assigns.panel == "reports",
-        do: assign(socket, :stats, Stats.compute_for(socket.assigns.script, content)),
+        do:
+          assign(socket,
+            stats: Stats.compute_for(socket.assigns.script, content),
+            prose_report: prose_report_for(socket.assigns.script, content)
+          ),
         else: socket
 
     socket = socket |> build_breakdown() |> load_characters()
@@ -804,6 +811,9 @@ defmodule MoorlandWeb.ScriptLive.Editor do
   end
 
   defp prose?(script), do: Moorland.Scripts.Script.prose?(script)
+
+  defp prose_report_for(script, content),
+    do: if(prose?(script), do: Moorland.Scripts.ProseReport.analyze(content))
 
   # The story-to-script pipeline this document belongs to: every stage, the
   # documents at each (linked), this one marked, and the way to the next.
@@ -1340,6 +1350,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
             char_meta={@char_meta}
             sprint={@sprint}
           />
+          <.prose_report :if={@panel == "reports" && @prose_report} report={@prose_report} />
           <.breakdown_panel
             :if={@panel == "breakdown"}
             script={@script}

@@ -35,7 +35,9 @@ type: Moorland learns your characters and places from the story itself
 (telling "Marchbanks" from words that are only capitalised because they
 start a sentence), offers full names like "Anna Grey" and "Dr. Okafor",
 and Tab completes them, so a name is spelled the same on page 300 as on
-page one.
+page one. Reports adds each chapter's length and gentle style pointers
+(echoed words, adverbs, possible passives, showy dialogue tags), each a
+click from its line.
 
 - **A real page while you type.** Plain text on the left, an industry
   standard screenplay page on the right: Courier, correct margins, scene

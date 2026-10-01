@@ -110,4 +110,35 @@ defmodule MoorlandWeb.ProseLiveTest do
     {:ok, old} = Scripts.create_mirror(origin, %{Map.delete(data, "kind") | "id" => story.id + 1})
     assert old.kind == "screenplay"
   end
+
+  test "Reports for prose adds chapters and style pointers that go to their lines", %{
+    conn: conn,
+    scope: scope
+  } do
+    {:ok, story} =
+      Scripts.create_script(scope, %{
+        title: "Tide",
+        kind: "prose",
+        content:
+          "# One\n\nThe lamp turned slowly. The lamp was broken. The lamp went dark.\n\n# Two\n\nNothing."
+      })
+
+    {:ok, lv, _html} = live(conn, ~p"/scripts/#{story.id}")
+    lv |> element("button[phx-value-panel=reports]") |> render_click()
+
+    assert has_element?(lv, "#prose-chapters", "One")
+    assert has_element?(lv, "#prose-chapters", "Two")
+    assert has_element?(lv, "#prose-style", "“lamp” ×3")
+    assert has_element?(lv, "#prose-style", "was broken")
+
+    lv |> element("#prose-style button", "slowly") |> render_click()
+    assert_push_event(lv, "jump_to_line", %{line: "2"})
+  end
+
+  test "screenplays have no prose report", %{conn: conn, scope: scope} do
+    {:ok, play} = Scripts.create_script(scope, %{title: "Play"})
+    {:ok, lv, _html} = live(conn, ~p"/scripts/#{play.id}")
+    lv |> element("button[phx-value-panel=reports]") |> render_click()
+    refute has_element?(lv, "#prose-report")
+  end
 end
