@@ -41,6 +41,7 @@ defmodule MoorlandWeb.ScriptLive.Schedule do
   defp rebuild(socket) do
     %{script: script, tags: tags, items: items} = socket.assigns
     board = Schedule.build(script.content, tags, items)
+    socket = assign(socket, :confirmations, Scripts.call_confirmations(script))
     assign(socket, board: board, dood: Schedule.day_out_of_days(board))
   end
 
@@ -322,6 +323,7 @@ defmodule MoorlandWeb.ScriptLive.Schedule do
                   row={row}
                   can_edit={@can_edit}
                   script_id={@script.id}
+                  confirmed={length(Map.get(@confirmations, row.item.uid, []))}
                 />
                 <.missing_row :if={row.kind == :missing} row={row} can_edit={@can_edit} />
               <% end %>
@@ -602,6 +604,7 @@ defmodule MoorlandWeb.ScriptLive.Schedule do
   attr :row, :map, required: true
   attr :can_edit, :boolean, required: true
   attr :script_id, :integer, required: true
+  attr :confirmed, :integer, default: 0
 
   defp day_row(assigns) do
     ~H"""
@@ -623,6 +626,13 @@ defmodule MoorlandWeb.ScriptLive.Schedule do
       </.link>
       <span class="tabular-nums opacity-80">
         {@row.scenes} {if @row.scenes == 1, do: "scene", else: "scenes"} · {eighths(@row.eighths)} pg
+      </span>
+      <span
+        :if={@confirmed > 0}
+        class="inline-flex items-center gap-0.5 rounded-full bg-white/15 px-1.5 text-[10px] tabular-nums"
+        title="Confirmed the call sheet"
+      >
+        <.icon name="hero-check" class="size-3" />{@confirmed}
       </span>
       <span :if={!@can_edit && @row.item.shoot_date} class="opacity-80">
         {day_label(@row.item.shoot_date)}

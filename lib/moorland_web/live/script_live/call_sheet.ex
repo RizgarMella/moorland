@@ -53,8 +53,15 @@ defmodule MoorlandWeb.ScriptLive.CallSheet do
 
     sheet = Schedule.call_sheet(board, day)
 
+    confirmed =
+      case sheet do
+        %{day: %{item: %{uid: uid}}} -> Map.get(Scripts.call_confirmations(script), uid, [])
+        _ -> []
+      end
+
     assign(socket,
       sheet: sheet,
+      confirmed: confirmed,
       page_title:
         if(sheet,
           do: "Call sheet · Day #{sheet.index} · #{script.title}",
@@ -74,6 +81,17 @@ defmodule MoorlandWeb.ScriptLive.CallSheet do
   ## Events
 
   @impl true
+  def handle_event("confirm", _params, socket) do
+    %{current_scope: scope, script: script, sheet: sheet} = socket.assigns
+
+    with %{day: %{item: %{id: id}}} <- sheet,
+         :ok <- Scripts.confirm_call(scope, script, id) do
+      {:noreply, rebuild(socket)}
+    else
+      _ -> {:noreply, socket}
+    end
+  end
+
   def handle_event("update_calls", params, socket) do
     %{current_scope: scope, script: script, sheet: sheet} = socket.assigns
 
@@ -99,6 +117,8 @@ defmodule MoorlandWeb.ScriptLive.CallSheet do
       _ -> {:noreply, socket}
     end
   end
+
+  defp me(scope), do: scope.user.email |> String.split("@") |> hd()
 
   defp blank_to_nil(""), do: nil
   defp blank_to_nil(value), do: value
@@ -222,6 +242,32 @@ defmodule MoorlandWeb.ScriptLive.CallSheet do
           id="call-sheet"
           class="mt-6 overflow-hidden rounded-lg border border-base-300 print:mt-0 print:rounded-none print:border-black"
         >
+          <div
+            :if={@sheet.day.item}
+            id="confirmations"
+            class="flex flex-wrap items-center gap-2 border-b border-base-300 px-5 py-2 text-xs print:hidden"
+          >
+            <button
+              :if={not Enum.any?(@confirmed, &(&1.name == me(@current_scope)))}
+              id="confirm-call"
+              type="button"
+              phx-click="confirm"
+              class="btn btn-neutral btn-xs"
+              title="Let the production office know you have your call"
+            >
+              <.icon name="hero-check" class="size-3.5" /> Got it
+            </button>
+            <span :if={@confirmed == []} class="text-base-content/50">Nobody has confirmed yet.</span>
+            <span :if={@confirmed != []} class="text-base-content/60">Confirmed:</span>
+            <span
+              :for={c <- @confirmed}
+              class="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-success"
+              title={"Confirmed #{Calendar.strftime(c.inserted_at, "%-d %b %H:%M")}"}
+            >
+              <.icon name="hero-check" class="size-3" />{c.name}
+            </span>
+          </div>
+
           <header class="flex flex-wrap items-end justify-between gap-4 border-b border-base-300 bg-base-200/50 px-5 py-4 print:border-black print:bg-transparent">
             <div>
               <div class="text-[11px] font-semibold uppercase tracking-wider text-base-content/50">

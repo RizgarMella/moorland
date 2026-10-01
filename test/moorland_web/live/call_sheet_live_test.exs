@@ -137,4 +137,42 @@ defmodule MoorlandWeb.CallSheetLiveTest do
     assert has_element?(lv, ~s|a[href="/scripts/#{script.id}/schedule/day/1"]|)
     assert has_element?(lv, ~s|a[href="/scripts/#{script.id}/schedule/day/3"]|)
   end
+
+  describe "confirmations" do
+    test "anyone who can see the sheet confirms, once", %{
+      conn: conn,
+      scope: scope,
+      script: script,
+      day1: day1
+    } do
+      {:ok, lv, _html} = live(conn, ~p"/scripts/#{script.id}/schedule/day/1")
+      assert has_element?(lv, "#confirmations", "Nobody has confirmed yet.")
+
+      lv |> element("#confirm-call") |> render_click()
+      refute has_element?(lv, "#confirm-call")
+      assert has_element?(lv, "#confirmations .text-success")
+
+      viewer = user_fixture()
+      {:ok, _} = Scripts.add_collaborator(scope, script, viewer.email, "viewer")
+      viewer_scope = Scope.for_user(viewer)
+      assert :ok = Scripts.confirm_call(viewer_scope, script, day1.id)
+      assert :ok = Scripts.confirm_call(viewer_scope, script, day1.id)
+
+      assert [_, _] = Scripts.call_confirmations(script)[day1.uid]
+
+      {:ok, lv, _html} = live(conn, ~p"/scripts/#{script.id}/schedule")
+      assert has_element?(lv, "#day-#{day1.id}", "2")
+    end
+
+    test "only day breaks of this script can be confirmed", %{scope: scope, script: script} do
+      [strip | _] = Scripts.list_schedule_items(script)
+      assert {:error, :not_found} = Scripts.confirm_call(scope, script, strip.id)
+      assert {:error, :not_found} = Scripts.confirm_call(scope, script, "x")
+    end
+
+    test "the open last day has nothing to confirm", %{conn: conn, script: script} do
+      {:ok, lv, _html} = live(conn, ~p"/scripts/#{script.id}/schedule/day/3")
+      refute has_element?(lv, "#confirmations")
+    end
+  end
 end

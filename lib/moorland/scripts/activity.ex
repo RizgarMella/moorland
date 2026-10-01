@@ -40,6 +40,7 @@ defmodule Moorland.Scripts.Activity do
 
   alias Moorland.Scripts.{
     BreakdownTag,
+    CallConfirmation,
     Comment,
     Note,
     ProductionTask,
@@ -176,6 +177,7 @@ defmodule Moorland.Scripts.Activity do
       tasks: script.id |> all_tasks() |> Enum.map(&task_payload/1),
       revision_sets: script.id |> all_revision_sets() |> Enum.map(&revision_payload/1),
       page_lock: Repo.one(from(s in Script, where: s.id == ^script.id, select: s.page_lock)),
+      call_confirmations: script.id |> all_confirmations() |> Enum.map(&confirmation_payload/1),
       schedule: schedule_payload(script.id),
       versions: Enum.map(versions, &version_payload/1)
     }
@@ -261,6 +263,11 @@ defmodule Moorland.Scripts.Activity do
         insert_suggestion(script, item, peer) == :ok or acc
       end)
 
+    confirmations? =
+      Enum.reduce(list(payload, "call_confirmations"), false, fn item, acc ->
+        insert_confirmation(script, item, key, []) == :ok or acc
+      end)
+
     revisions? =
       Enum.reduce(list(payload, "revision_sets"), false, fn item, acc ->
         if find(RevisionSet, script.id, item["uid"]) == nil,
@@ -322,6 +329,14 @@ defmodule Moorland.Scripts.Activity do
     changed = announce_tasks(script, tasks? or tasks_deleted?) or changed
     changed = announce_revisions(script, revisions? or RevisionSet in deleted) or changed
     if suggestions?, do: Scripts.broadcast(script.id, {:suggestions_changed, script.id})
+
+    changed =
+      if confirmations? do
+        Scripts.broadcast(script.id, {:schedule_changed, script.id})
+        true
+      else
+        changed
+      end
 
     changed =
       case payload["schedule"] do
@@ -432,6 +447,13 @@ defmodule Moorland.Scripts.Activity do
         )
       )
 
+    confirmations =
+      Repo.all(
+        from(c in CallConfirmation,
+          where: c.script_id == ^mirror.id and is_nil(c.synced_at) and is_nil(c.peer_key)
+        )
+      )
+
     schedule_rev = pending_schedule_rev(mirror.id)
 
     %{
@@ -444,6 +466,7 @@ defmodule Moorland.Scripts.Activity do
           Enum.map(shots, &Map.put(shot_payload(&1), :image_data, shot_image_data(mirror, &1))),
         tasks: Enum.map(tasks, &task_payload/1),
         revision_sets: Enum.map(revision_sets, &revision_payload/1),
+        call_confirmations: Enum.map(confirmations, &confirmation_payload/1),
         schedule: if(schedule_rev, do: schedule_payload(mirror.id)),
         versions: Enum.map(versions, &version_payload/1),
         deletions: Enum.map(deletions, &Map.take(&1, [:kind, :uid]))
@@ -455,6 +478,7 @@ defmodule Moorland.Scripts.Activity do
         shots: Enum.map(shots, &{&1.id, &1.rev}),
         tasks: Enum.map(tasks, &{&1.id, &1.rev}),
         revision_sets: Enum.map(revision_sets, & &1.id),
+        call_confirmations: Enum.map(confirmations, & &1.id),
         schedule: if(schedule_rev, do: {mirror.id, schedule_rev}),
         versions: Enum.map(versions, & &1.id),
         deletions: Enum.map(deletions, & &1.id)
@@ -464,7 +488,7 @@ defmodule Moorland.Scripts.Activity do
 
   def empty?(%{payload: p}) do
     p.comments == [] and p.notes == [] and p.tags == [] and p.shots == [] and p.tasks == [] and
-      p.revision_sets == [] and p.schedule == nil and
+      p.revision_sets == [] and p.call_confirmations == [] and p.schedule == nil and
       p.versions == [] and p.deletions == []
   end
 
@@ -497,6 +521,11 @@ defmodule Moorland.Scripts.Activity do
       from(t in BreakdownTag, where: t.id == ^id and t.rev == ^rev)
       |> Repo.update_all(set: [synced_rev: rev])
     end
+
+    confirmation_ids = Map.get(receipt, :call_confirmations, [])
+
+    from(c in CallConfirmation, where: c.id in ^confirmation_ids)
+    |> Repo.update_all(set: [synced_at: DateTime.utc_now(:second)])
 
     revision_ids = Map.get(receipt, :revision_sets, [])
 
@@ -661,6 +690,29 @@ defmodule Moorland.Scripts.Activity do
         false
       end
 
+    confirmations? =
+      if is_list(data["call_confirmations"]) do
+        items = list(data, "call_confirmations")
+        now = DateTime.utc_now(:second)
+
+        added =
+          Enum.reduce(items, false, fn item, acc ->
+            insert_confirmation(mirror, item, key, synced_at: now) == :ok or acc
+          end)
+
+        uids = items |> Enum.map(& &1["uid"]) |> Enum.filter(&is_binary/1)
+
+        {gone, _} =
+          from(c in CallConfirmation,
+            where: c.script_id == ^mirror.id and not is_nil(c.synced_at) and c.uid not in ^uids
+          )
+          |> Repo.delete_all()
+
+        added or gone > 0
+      else
+        false
+      end
+
     revisions? =
       if is_list(data["revision_sets"]) do
         items = list(data, "revision_sets")
@@ -717,6 +769,7 @@ defmodule Moorland.Scripts.Activity do
     announce_shots(mirror, shots?)
     announce_tasks(mirror, tasks?)
     announce_revisions(mirror, revisions?)
+    if confirmations?, do: Scripts.broadcast(mirror.id, {:schedule_changed, mirror.id})
     if page_lock?, do: Scripts.broadcast(mirror.id, {:script_updated, mirror.id})
     {:ok, mirror}
   end
@@ -1223,6 +1276,38 @@ defmodule Moorland.Scripts.Activity do
         end
     end
   end
+
+  defp insert_confirmation(script, item, peer_key, extra) do
+    name = clip(item["name"], 80)
+
+    if is_binary(item["uid"]) and is_binary(item["day_uid"]) and name != "" do
+      %CallConfirmation{
+        script_id: script.id,
+        uid: item["uid"],
+        day_uid: clip(item["day_uid"], 64),
+        name: name,
+        peer_key: peer_key,
+        inserted_at: parse_time(item["at"])
+      }
+      |> Ecto.Changeset.change(extra)
+      |> Repo.insert(on_conflict: :nothing)
+      |> case do
+        {:ok, %CallConfirmation{id: id}} when is_integer(id) -> :ok
+        _ -> :skip
+      end
+    else
+      :skip
+    end
+  end
+
+  defp all_confirmations(script_id),
+    do:
+      Repo.all(
+        from(c in CallConfirmation, where: c.script_id == ^script_id, order_by: [asc: c.id])
+      )
+
+  defp confirmation_payload(c),
+    do: %{uid: c.uid, day_uid: c.day_uid, name: c.name, at: iso(c.inserted_at)}
 
   defp clean_page_lock(nil), do: nil
 

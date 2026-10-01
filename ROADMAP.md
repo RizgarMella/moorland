@@ -236,9 +236,12 @@ it wrote; the origin's owner can delete anything and the next pull follows.
   and per-cast calls stored on the day's break, scenes with synopses, cast
   with DOOD status and actors from the viewer's Contacts by role,
   department needs from the breakdown, advance schedule; they reach every
-  peer the script is shared with, since the board syncs. Left: map and
-  weather (need the network), attachments, and received/confirmed
-  tracking.
+  peer the script is shared with, since the board syncs. *Confirmed
+  tracking (Oct 1 2026):* "Got it" on a call sheet records who confirmed
+  which day (`CallConfirmation`), listed on the sheet and counted on the
+  stripboard; confirmations travel between installs insert-only, and a
+  viewer peer may send confirmations though nothing else. Left: map and
+  weather (need the network), and attachments.
 
 ## Tier 4 — Epic (multi-week, architectural)
 

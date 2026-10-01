@@ -33,7 +33,8 @@ defmodule Moorland.Scripts do
     ScheduleItem,
     Shot,
     ProductionTask,
-    Suggestion
+    Suggestion,
+    CallConfirmation
   }
 
   @auto_snapshot_interval_seconds 10 * 60
@@ -1043,6 +1044,40 @@ defmodule Moorland.Scripts do
     broadcast(script.id, {:suggestions_changed, script.id})
   end
 
+  ## Call sheet confirmations
+
+  @doc "Who has confirmed each day's call: `%{day_uid => [confirmation]}`, earliest first."
+  def call_confirmations(%Script{} = script) do
+    from(c in CallConfirmation,
+      where: c.script_id == ^script.id,
+      order_by: [asc: c.inserted_at, asc: c.id]
+    )
+    |> Repo.all()
+    |> Enum.group_by(& &1.day_uid)
+  end
+
+  @doc """
+  "Got it": the caller confirms a shoot day's call sheet. Anyone who can
+  open the script may; confirming twice is harmless.
+  """
+  def confirm_call(%Scope{user: user} = scope, %Script{} = script, day_item_id) do
+    with :ok <- authorize(scope, script, :view),
+         %ScheduleItem{kind: "day", uid: day_uid} <- get_schedule_item(script, day_item_id) do
+      name = user.email |> String.split("@") |> hd()
+
+      %CallConfirmation{script_id: script.id, day_uid: day_uid, name: name, user_id: user.id}
+      |> Repo.insert(on_conflict: :nothing)
+
+      broadcast(script.id, {:schedule_changed, script.id})
+      nudge_peers(script)
+      :ok
+    else
+      nil -> {:error, :not_found}
+      %ScheduleItem{} -> {:error, :not_found}
+      error -> error
+    end
+  end
+
   ## Locked pages
 
   @doc """
@@ -1533,6 +1568,18 @@ defmodule Moorland.Scripts do
 
         peer = Moorland.Peers.get_by_public_key(public_key)
         Activity.apply_from_peer(peer, Repo.get!(Script, script_id), payload)
+        {:ok, %{ok: true}}
+
+      # A viewer reads, but may still say it got the call sheet.
+      %PeerShare{} when is_map_key(payload, "call_confirmations") ->
+        peer = Moorland.Peers.get_by_public_key(public_key)
+
+        Activity.apply_from_peer(
+          peer,
+          Repo.get!(Script, script_id),
+          Map.take(payload, ["call_confirmations"])
+        )
+
         {:ok, %{ok: true}}
 
       %PeerShare{} ->

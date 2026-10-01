@@ -255,6 +255,33 @@ defmodule Moorland.BreakdownSyncTest do
     end
   end
 
+  test "call sheet confirmations travel, even from a viewer mirror", ctx do
+    {:ok, day} = Scripts.add_day_break(ctx.alice, ctx.origin)
+    :ok = Scripts.set_peer_share(ctx.alice, ctx.origin, ctx.peer.id, "viewer")
+    mirror = pull(ctx.mirror, ctx.origin)
+    [mirror_day] = Scripts.list_schedule_items(mirror)
+    assert mirror_day.uid == day.uid
+
+    {:ok, mirror} = Scripts.apply_origin_content(mirror, "Shared Draft", @content, 1, "viewer")
+    assert :ok = Scripts.confirm_call(ctx.bob, mirror, mirror_day.id)
+    assert {:ok, _} = push(fresh_mirror(ctx), ctx.origin)
+
+    bob = ctx.bob.user.email |> String.split("@") |> hd()
+    assert [%{name: ^bob}] = Scripts.call_confirmations(ctx.origin)[day.uid]
+
+    # A viewer may confirm, but nothing else rides along.
+    payload = %{"call_confirmations" => [], "comments" => [%{"uid" => "c", "body" => "sneaky"}]}
+    assert {:ok, _} = Scripts.peer_apply_activity(peer_key(), ctx.origin.id, payload)
+    assert Scripts.list_comments(ctx.origin) == []
+
+    # And everyone's confirmations come back to the mirror.
+    :ok = Scripts.confirm_call(ctx.alice, ctx.origin, day.id)
+    pull(fresh_mirror(ctx), ctx.origin)
+    assert length(Scripts.call_confirmations(fresh_mirror(ctx))[day.uid]) == 2
+  end
+
+  defp fresh_mirror(ctx), do: Moorland.Repo.get!(Moorland.Scripts.Script, ctx.mirror.id)
+
   describe "storyboard frames" do
     defp frame_file(bytes) do
       path = Path.join(System.tmp_dir!(), "frame-#{System.unique_integer([:positive])}.png")
