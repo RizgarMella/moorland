@@ -89,4 +89,49 @@ defmodule Moorland.MdnsTest do
       assert {:error, :timeout} = :gen_udp.recv(socket, 0, 200)
     end
   end
+
+  describe "networks changing" do
+    @home {{192, 168, 1, 20}, {255, 255, 255, 0}}
+    @vpn {{10, 8, 0, 3}, {255, 255, 0, 0}}
+
+    test "only a real change calls for joining or announcing" do
+      assert Mdns.network_changes([@home, @vpn], [@vpn, @home]) == {[], false}
+      assert Mdns.network_changes([@home], [@home, @vpn]) == {[{10, 8, 0, 3}], true}
+      # A new address on the same network (DHCP renewed differently).
+      assert Mdns.network_changes([@home], [{{192, 168, 1, 31}, {255, 255, 255, 0}}]) ==
+               {[{192, 168, 1, 31}], true}
+
+      assert Mdns.network_changes([@home, @vpn], [@home]) == {[], true}
+      # Nowhere left to announce to.
+      assert Mdns.network_changes([@home], []) == {[], false}
+      # Woke before the Wi-Fi: the first network to appear is joined.
+      assert Mdns.network_changes([], [@home]) == {[{192, 168, 1, 20}], true}
+    end
+
+    test "the responder notices networks that appear after it started" do
+      nets = start_supervised!({Agent, fn -> [] end})
+
+      start_supervised!(
+        {Mdns,
+         port: 20_000 + :rand.uniform(20_000),
+         name: "moorland-test02.local",
+         networks: fn -> Agent.get(nets, & &1) end,
+         watch_ms: nil}
+      )
+
+      assert :sys.get_state(Mdns).seen == []
+
+      Agent.update(nets, fn _ -> [@home] end)
+      send(Mdns, :watch)
+      assert :sys.get_state(Mdns).seen == [@home]
+    end
+  end
+
+  test "without a readable identity it stays quiet instead of crashing" do
+    # This process holds no database checkout, so the identity can't be read.
+    start_supervised!({Mdns, port: 20_000 + :rand.uniform(20_000)})
+
+    assert :sys.get_state(Mdns).socket == nil
+    assert Mdns.url() == nil
+  end
 end
