@@ -22,6 +22,15 @@ defmodule Moorland.Storage do
     Application.get_env(:moorland, :mirror_dir) || Path.join(data_dir(), "scripts")
   end
 
+  @doc "Where storyboard images and other media live: the data folder's media/."
+  def media_dir do
+    Application.get_env(:moorland, :media_dir) || Path.join(data_dir(), "media")
+  end
+
+  @doc "The folder for one script's media."
+  def media_dir(script_id) when is_integer(script_id),
+    do: Path.join(media_dir(), Integer.to_string(script_id))
+
   def pointer_path do
     Application.get_env(:moorland, :data_dir_pointer) ||
       Path.join(System.user_home!(), ".moorland/data_dir")
@@ -99,6 +108,9 @@ defmodule Moorland.Storage do
               File.exists?(source) do
             File.cp(source, target <> suffix)
           end
+
+          # Media files travel with the database.
+          if File.dir?(media_dir()), do: File.cp_r(media_dir(), Path.join(new_dir, "media"))
 
           :copied
         end

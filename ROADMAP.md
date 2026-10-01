@@ -192,7 +192,11 @@ it wrote; the origin's owner can delete anything and the next pull follows.
   O skipped), size/angle/movement/lens/description edited in place, up/down
   ordering, print layout. Shots anchor to words like tags
   (`Breakdown.place/2`, `Scripts.ShotList`) and sync between installs like
-  tags. Left: storyboard images and mood boards (file storage).
+  tags. *Storyboard frames (Oct 1 2026):* one image per shot (JPEG, PNG,
+  WebP, 5 MB), uploaded on the shot list, kept under the data folder's
+  `media/<script id>/` (moved with the folder, removed with the shot or
+  script), served only to people who can open the script, and printed with
+  the shot list. Left: frames travelling to peers, and mood boards.
 - **Media library** [production] — shared reference files in the data folder,
   synced to production peers like scripts are.
 - **Production calendar & tasks** [production] — prep/shoot/post timeline and

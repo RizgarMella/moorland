@@ -327,6 +327,7 @@ defmodule Moorland.Scripts do
     with :ok <- authorize(scope, script, :manage),
          {:ok, deleted} <- Repo.delete(script) do
       Moorland.Storage.remove_mirror(deleted)
+      File.rm_rf(Moorland.Storage.media_dir(deleted.id))
       {:ok, deleted}
     end
   end
@@ -823,9 +824,67 @@ defmodule Moorland.Scripts do
     end
   end
 
+  @image_types %{
+    ".jpg" => "image/jpeg",
+    ".jpeg" => "image/jpeg",
+    ".png" => "image/png",
+    ".webp" => "image/webp"
+  }
+
+  def image_types, do: @image_types
+
+  @doc """
+  Gives a shot its storyboard frame, copied from `source` (an uploaded
+  temp file) into the data folder; any earlier frame is removed. Images
+  stay on this installation: they do not travel to peers.
+  """
+  def attach_shot_image(%Scope{} = scope, %Script{} = script, shot_id, source, ext) do
+    ext = String.downcase(ext)
+
+    with true <- Map.has_key?(@image_types, ext) || {:error, :unsupported},
+         %Shot{} = shot <- own_shot(scope, script, shot_id) do
+      dir = Moorland.Storage.media_dir(script.id)
+      name = "shot-#{shot.uid}-#{System.unique_integer([:positive])}#{ext}"
+      File.mkdir_p!(dir)
+      File.cp!(source, Path.join(dir, name))
+      remove_image_file(script, shot)
+
+      shot
+      |> Ecto.Changeset.change(image: name)
+      |> Repo.update()
+      |> tap_shots(script)
+    end
+  end
+
+  def remove_shot_image(%Scope{} = scope, %Script{} = script, shot_id) do
+    with %Shot{} = shot <- own_shot(scope, script, shot_id) do
+      remove_image_file(script, shot)
+      shot |> Ecto.Changeset.change(image: nil) |> Repo.update() |> tap_shots(script)
+    end
+  end
+
+  @doc "The file and content type of a shot's frame, for a viewer of the script."
+  def shot_image(%Scope{} = scope, %Script{} = script, shot_id) do
+    with :ok <- authorize(scope, script, :view),
+         %Shot{script_id: sid, image: name} when sid == script.id and is_binary(name) <-
+           get_by_id(Shot, shot_id),
+         path = Path.join(Moorland.Storage.media_dir(script.id), name),
+         true <- File.regular?(path) do
+      {:ok, path, Map.fetch!(@image_types, Path.extname(name))}
+    else
+      _ -> {:error, :not_found}
+    end
+  end
+
+  defp remove_image_file(script, %Shot{image: name}) when is_binary(name),
+    do: File.rm(Path.join(Moorland.Storage.media_dir(script.id), name))
+
+  defp remove_image_file(_script, _shot), do: :ok
+
   def delete_shot(%Scope{} = scope, %Script{} = script, shot_id) do
     with %Shot{} = shot <- own_shot(scope, script, shot_id) do
       Activity.remember_deletion(script, "shot", shot)
+      remove_image_file(script, shot)
       Repo.delete(shot) |> tap_shots(script)
       :ok
     end

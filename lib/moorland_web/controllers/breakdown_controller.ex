@@ -46,6 +46,23 @@ defmodule MoorlandWeb.BreakdownController do
 
   def prose(conn, _params), do: conn |> put_status(404) |> text("Not found")
 
+  @doc "A shot's storyboard frame, for anyone who can open the script."
+  def shot_image(conn, %{"id" => id, "shot_id" => shot_id}) do
+    scope = conn.assigns.current_scope
+    {script, _role} = Scripts.get_script!(scope, id)
+
+    case Scripts.shot_image(scope, script, shot_id) do
+      {:ok, path, type} ->
+        conn
+        |> put_resp_content_type(type, nil)
+        |> put_resp_header("cache-control", "private, max-age=86400")
+        |> send_file(200, path)
+
+      {:error, _} ->
+        conn |> put_status(404) |> text("Not found")
+    end
+  end
+
   defp filename(title) do
     case title |> String.replace(~r/[^\p{L}\p{N} _.-]+/u, "") |> String.trim() do
       "" -> "script"

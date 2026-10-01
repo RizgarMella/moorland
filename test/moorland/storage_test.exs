@@ -73,6 +73,26 @@ defmodule Moorland.StorageTest do
     assert File.exists?(Path.join(mirror_dir, "Two (#{b.id}).fountain"))
   end
 
+  test "relocate brings the media folder along", %{base: base} do
+    media = Path.join(base, "media")
+    Application.put_env(:moorland, :media_dir, media)
+
+    on_exit(fn ->
+      Application.put_env(
+        :moorland,
+        :media_dir,
+        Path.join(System.tmp_dir!(), "moorland_test_media")
+      )
+    end)
+
+    File.mkdir_p!(Path.join(media, "7"))
+    File.write!(Path.join([media, "7", "shot-a.png"]), "png")
+
+    target = Path.join(base, "elsewhere")
+    assert {:ok, :copied, _dir} = Storage.relocate(target)
+    assert File.read!(Path.join([target, "media", "7", "shot-a.png"])) == "png"
+  end
+
   test "relocate copies the database and writes the pointer", %{base: base, pointer: pointer} do
     target = Path.join(base, "new_home")
 

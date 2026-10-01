@@ -78,6 +78,7 @@ defmodule MoorlandWeb.Router do
 
     get "/scripts/:id/breakdown.csv", BreakdownController, :csv
     get "/scripts/:id/export/:format", BreakdownController, :prose
+    get "/scripts/:id/shots/:shot_id/image", BreakdownController, :shot_image
     post "/users/update-password", UserSessionController, :update_password
   end
 

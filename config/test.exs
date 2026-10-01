@@ -20,6 +20,9 @@ config :moorland, MoorlandWeb.Endpoint,
   secret_key_base: "TC9yhZ/CvG3nYNLXUdLM6+4CGfMWp5idCgKEVxo3fogyG+b9J4N0DeDdZiVlPnW6",
   server: false
 
+# Storyboard images and other media go somewhere disposable in tests.
+config :moorland, :media_dir, Path.join(System.tmp_dir!(), "moorland_test_media")
+
 # In test we don't send emails
 config :moorland, Moorland.Mailer, adapter: Swoosh.Adapters.Test
 

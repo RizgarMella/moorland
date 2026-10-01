@@ -15,6 +15,8 @@ defmodule Moorland.Scripts.Shot do
     field :movement, :string
     field :lens, :string
     field :description, :string, default: ""
+    # Storyboard frame: a file name under Storage.media_dir/<script id>.
+    field :image, :string
 
     # Peer sync (see Comment).
     field :uid, :string, autogenerate: {Ecto.UUID, :generate, []}

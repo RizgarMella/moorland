@@ -19,7 +19,19 @@ defmodule MoorlandWeb.ScriptLive.Shots do
 
     {:ok,
      socket
-     |> assign(script: script, role: role, page_title: "Shot list · #{script.title}")
+     |> assign(
+       script: script,
+       role: role,
+       page_title: "Shot list · #{script.title}",
+       image_target: nil
+     )
+     |> allow_upload(:image,
+       accept: ~w(.jpg .jpeg .png .webp),
+       max_entries: 1,
+       max_file_size: 5_000_000,
+       auto_upload: true,
+       progress: &handle_progress/3
+     )
      |> reload()}
   end
 
@@ -67,6 +79,53 @@ defmodule MoorlandWeb.ScriptLive.Shots do
     Scripts.delete_shot(scope, script, id) |> respond(socket)
   end
 
+  def handle_event("pick_image", %{"id" => id}, socket) do
+    case Integer.parse(id) do
+      {id, ""} -> {:noreply, assign(socket, :image_target, id)}
+      _ -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("cancel_image", _params, socket) do
+    socket =
+      Enum.reduce(
+        socket.assigns.uploads.image.entries,
+        socket,
+        &cancel_upload(&2, :image, &1.ref)
+      )
+
+    {:noreply, assign(socket, :image_target, nil)}
+  end
+
+  def handle_event("validate_image", _params, socket), do: {:noreply, socket}
+
+  def handle_event("remove_image", %{"id" => id}, socket) do
+    %{current_scope: scope, script: script} = socket.assigns
+    Scripts.remove_shot_image(scope, script, id) |> respond(socket)
+  end
+
+  # An image is attached the moment it finishes uploading.
+  defp handle_progress(:image, entry, socket) do
+    if entry.done? do
+      %{current_scope: scope, script: script, image_target: target} = socket.assigns
+
+      result =
+        consume_uploaded_entry(socket, entry, fn %{path: path} ->
+          {:ok,
+           Scripts.attach_shot_image(scope, script, target, path, Path.extname(entry.client_name))}
+        end)
+
+      socket = assign(socket, :image_target, nil)
+
+      case result do
+        {:ok, _} -> {:noreply, reload(socket)}
+        other -> respond(other, socket)
+      end
+    else
+      {:noreply, socket}
+    end
+  end
+
   defp respond({:error, :not_allowed}, socket),
     do: {:noreply, put_flash(socket, :error, "That shot is someone else's to change.")}
 
@@ -102,6 +161,11 @@ defmodule MoorlandWeb.ScriptLive.Shots do
   # so under the scene's own header is noise.
   defp same_words?(a, b),
     do: Moorland.Scripts.Breakdown.normalize(a) == Moorland.Scripts.Breakdown.normalize(b)
+
+  defp upload_error(:too_large), do: "Images up to 5 MB."
+  defp upload_error(:not_accepted), do: "JPEG, PNG or WebP only."
+  defp upload_error(:too_many_files), do: "One image at a time."
+  defp upload_error(_), do: "That upload failed."
 
   defp can_change?(shot, role, user_id),
     do: shot.author_id == user_id or Scripts.can_edit?(role)
@@ -213,6 +277,9 @@ defmodule MoorlandWeb.ScriptLive.Shots do
                 :for={{shot, i} <- Enum.with_index(scene.shots)}
                 shot={shot}
                 heading={scene.heading}
+                script_id={@script.id}
+                image_target={@image_target}
+                uploads={@uploads}
                 prev={i > 0 && Enum.at(scene.shots, i - 1)}
                 next={Enum.at(scene.shots, i + 1)}
                 editable={can_change?(shot, @role, @current_scope.user.id)}
@@ -252,14 +319,79 @@ defmodule MoorlandWeb.ScriptLive.Shots do
 
   attr :shot, :map, required: true
   attr :heading, :string, required: true
+  attr :script_id, :integer, required: true
+  attr :image_target, :any, required: true
+  attr :uploads, :map, required: true
   attr :prev, :any, required: true
   attr :next, :any, required: true
   attr :editable, :boolean, required: true
 
   defp shot_row(assigns) do
     ~H"""
-    <div id={"shot-#{@shot.id}"} class="group flex items-start gap-3 px-4 py-2">
+    <div id={"shot-#{@shot.id}"} class="group flex flex-wrap items-start gap-3 px-4 py-2">
       <span class="w-12 shrink-0 pt-1 text-sm font-semibold tabular-nums">{@shot.number}</span>
+
+      <div :if={@shot.image || @editable} class="w-32 shrink-0">
+        <img
+          :if={@shot.image}
+          src={~p"/scripts/#{@script_id}/shots/#{@shot.id}/image?v=#{@shot.image}"}
+          alt={"Storyboard frame for shot #{@shot.number}"}
+          class="aspect-video w-32 rounded border border-base-300 bg-base-200 object-cover"
+        />
+        <button
+          :if={!@shot.image && @editable && @image_target != @shot.id}
+          type="button"
+          phx-click="pick_image"
+          phx-value-id={@shot.id}
+          class="flex aspect-video w-32 items-center justify-center rounded border border-dashed border-base-300 text-[11px] text-base-content/50 transition hover:border-base-content/40 hover:text-base-content print:hidden"
+          title="Add a storyboard frame (stays on this installation)"
+        >
+          <.icon name="hero-photo" class="mr-1 size-3.5" /> Frame
+        </button>
+        <div :if={@shot.image && @editable} class="mt-0.5 flex gap-2 text-[10px] print:hidden">
+          <button
+            type="button"
+            phx-click="pick_image"
+            phx-value-id={@shot.id}
+            class="text-base-content/50 hover:text-base-content"
+          >
+            Replace
+          </button>
+          <button
+            type="button"
+            phx-click="remove_image"
+            phx-value-id={@shot.id}
+            class="text-base-content/50 hover:text-error"
+          >
+            Remove
+          </button>
+        </div>
+        <form
+          :if={@image_target == @shot.id}
+          id={"shot-image-form-#{@shot.id}"}
+          phx-change="validate_image"
+          phx-submit="validate_image"
+          class="mt-1 space-y-1 print:hidden"
+        >
+          <.live_file_input upload={@uploads.image} class="w-full text-[11px]" />
+          <p :for={entry <- @uploads.image.entries} class="text-[10px] text-base-content/60">
+            {entry.progress}%
+            <span :for={err <- upload_errors(@uploads.image, entry)} class="text-error">
+              {upload_error(err)}
+            </span>
+          </p>
+          <p :for={err <- upload_errors(@uploads.image)} class="text-[10px] text-error">
+            {upload_error(err)}
+          </p>
+          <button
+            type="button"
+            phx-click="cancel_image"
+            class="text-[10px] text-base-content/50 hover:text-base-content"
+          >
+            Cancel
+          </button>
+        </form>
+      </div>
 
       <form
         :if={@editable}
