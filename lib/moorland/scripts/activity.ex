@@ -136,12 +136,16 @@ defmodule Moorland.Scripts.Activity do
   end
 
   @doc "Applies activity pushed by an editor peer. Broadcasts and nudges other peers on change."
-  def apply_from_peer(%Peer{public_key: key}, %Script{} = script, payload) when is_map(payload) do
+  def apply_from_peer(%Peer{public_key: key} = peer, %Script{} = script, payload)
+      when is_map(payload) do
+    # What an assistant peer writes is marked as such, here and onwards.
+    assistant? = peer.assistant == true
+
     comments? =
       Enum.reduce(list(payload, "comments"), false, fn item, acc ->
         case find(Comment, script.id, item["uid"]) do
           nil ->
-            case insert_comment(script, item, key, :origin) do
+            case insert_comment(script, item, key, :origin, assistant?) do
               {:ok, comment} ->
                 Scripts.notify_comment(script, comment, nil)
                 true
@@ -158,7 +162,7 @@ defmodule Moorland.Scripts.Activity do
     notes? =
       Enum.reduce(list(payload, "notes"), false, fn item, acc ->
         case find(Note, script.id, item["uid"]) do
-          nil -> insert_note(script, item, key, :origin) == :ok or acc
+          nil -> insert_note(script, item, key, :origin, assistant?) == :ok or acc
           %Note{peer_key: ^key} = existing -> apply_note_fields(existing, item, :origin) or acc
           %Note{} -> acc
         end
@@ -371,7 +375,7 @@ defmodule Moorland.Scripts.Activity do
       Enum.reduce(comment_items, false, fn item, acc ->
         case find(Comment, mirror.id, item["uid"]) do
           nil ->
-            case insert_comment(mirror, item, key, :mirror) do
+            case insert_comment(mirror, item, key, :mirror, item["assistant"] == true) do
               {:ok, comment} ->
                 unless first_pull?, do: Scripts.notify_comment(mirror, comment, nil)
                 true
@@ -391,7 +395,7 @@ defmodule Moorland.Scripts.Activity do
       Enum.reduce(note_items, false, fn item, acc ->
         case find(Note, mirror.id, item["uid"]) do
           nil ->
-            insert_note(mirror, item, key, :mirror) == :ok or acc
+            insert_note(mirror, item, key, :mirror, item["assistant"] == true) == :ok or acc
 
           %Note{} = existing ->
             if pending?(existing),
@@ -471,7 +475,7 @@ defmodule Moorland.Scripts.Activity do
   defp update_changes(%{rev: rev}, :mirror), do: [rev: rev + 1, synced_rev: rev + 1]
   defp update_changes(_record, :origin), do: []
 
-  defp insert_comment(script, item, peer_key, side) do
+  defp insert_comment(script, item, peer_key, side, assistant?) do
     body = clip(item["body"], @max_body)
 
     parent_id =
@@ -494,6 +498,7 @@ defmodule Moorland.Scripts.Activity do
         anchor_text: clip(item["anchor_text"], 200),
         body: body,
         resolved_at: parse_time(item["resolved_at"]),
+        from_assistant: assistant?,
         remote_author: handle_from(item),
         peer_key: peer_key,
         inserted_at: parse_time(item["inserted_at"])
@@ -521,7 +526,7 @@ defmodule Moorland.Scripts.Activity do
     end
   end
 
-  defp insert_note(script, item, peer_key, side) do
+  defp insert_note(script, item, peer_key, side, assistant?) do
     body = clip(item["body"], @max_body)
 
     if body == "" or not is_binary(item["uid"]) do
@@ -534,6 +539,7 @@ defmodule Moorland.Scripts.Activity do
         color: color(item["color"]),
         pinned: item["pinned"] == true,
         kind: if(item["kind"] in Note.kinds(), do: item["kind"], else: "note"),
+        from_assistant: assistant?,
         remote_author: handle_from(item),
         peer_key: peer_key,
         inserted_at: parse_time(item["inserted_at"])
@@ -748,6 +754,7 @@ defmodule Moorland.Scripts.Activity do
       anchor_text: c.anchor_text,
       body: c.body,
       author: handle(c),
+      assistant: c.from_assistant,
       resolved_at: iso(c.resolved_at),
       inserted_at: iso(c.inserted_at)
     }
@@ -761,6 +768,7 @@ defmodule Moorland.Scripts.Activity do
       pinned: n.pinned,
       kind: n.kind,
       author: handle(n),
+      assistant: n.from_assistant,
       inserted_at: iso(n.inserted_at)
     }
   end

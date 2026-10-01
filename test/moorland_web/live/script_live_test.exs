@@ -136,4 +136,21 @@ defmodule MoorlandWeb.ScriptLiveTest do
       live(conn, ~p"/scripts/#{script.id}")
     end
   end
+
+  test "the Peers page marks a peer as an assistant", %{conn: conn, scope: scope} do
+    %{public: pub} = Moorland.Peers.Crypto.generate_keypair()
+
+    {:ok, peer} =
+      Moorland.Peers.add_peer(
+        scope,
+        Moorland.Peers.Crypto.format_code(pub, "10.0.0.5", 4000),
+        "Bot"
+      )
+
+    {:ok, lv, _html} = live(conn, ~p"/peers")
+    lv |> element("#assistant-#{peer.id}") |> render_click()
+    assert Moorland.Peers.get_peer!(peer.id).assistant
+    lv |> element("#assistant-#{peer.id}") |> render_click()
+    refute Moorland.Peers.get_peer!(peer.id).assistant
+  end
 end

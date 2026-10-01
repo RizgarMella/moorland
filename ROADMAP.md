@@ -292,7 +292,14 @@ ships, and what is still open.
   comments (`line_no`, `anchor_text`, `remote_author`). Outside the app: the
   assistant runtime, model choice, keys, prompts, and its own release, which
   is the separate plan. *First step:* the commenter role and the assistant
-  badge, verified with a test that plays the peer. *Open:* size and rate
+  badge, verified with a test that plays the peer. *First step shipped
+  (Oct 1 2026):* `commenter` peer shares (comments, notes, breakdown tags
+  and deletions of its own; never saves, snapshots or the board), an
+  Assistant checkbox per peer on the Peers page, and `from_assistant` on
+  comments and notes so the AI badge survives relaying to other mirrors;
+  an assistant's @mentions notify in the app but send no email.
+  `test/moorland_web/controllers/assistant_peer_test.exs` plays the
+  assistant over the sealed wire. *Open:* size and rate
   limits on assistant pushes; whether "may propose edits" is a per-share
   toggle; suggestion records versus plain editor saves.
 - **Podcast and educational scripts** [formats] — podcast episodes (hosts,

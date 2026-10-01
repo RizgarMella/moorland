@@ -65,6 +65,11 @@ defmodule MoorlandWeb.PeerLive.Index do
     end
   end
 
+  def handle_event("toggle_assistant", %{"id" => id} = params, socket) do
+    Peers.set_assistant(socket.assigns.current_scope, id, params["assistant"] == "true")
+    {:noreply, refresh(socket)}
+  end
+
   def handle_event("remove_peer", %{"id" => id}, socket) do
     Peers.remove_peer(socket.assigns.current_scope, id)
     {:noreply, refresh(socket)}
@@ -341,6 +346,12 @@ defmodule MoorlandWeb.PeerLive.Index do
                   <span class="font-mono text-[10px] text-base-content/40">
                     {Crypto.fingerprint(peer.public_key)}
                   </span>
+                  <span
+                    :if={peer.assistant}
+                    class="rounded bg-primary/15 px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-primary"
+                  >
+                    AI
+                  </span>
                 </div>
                 <div class="mt-0.5 text-[11px] text-base-content/50">
                   <span class="font-mono">{peer.host}:{peer.port}</span>
@@ -348,6 +359,20 @@ defmodule MoorlandWeb.PeerLive.Index do
                   <span :if={peer.last_error} class="text-error"> · {peer.last_error}</span>
                 </div>
               </div>
+              <label
+                class="flex shrink-0 cursor-pointer items-center gap-1.5 text-[11px] text-base-content/60"
+                title="An AI assistant connected as a peer: its comments and notes are badged and its @mentions never send email"
+              >
+                <input
+                  id={"assistant-#{peer.id}"}
+                  type="checkbox"
+                  class="checkbox checkbox-xs"
+                  checked={peer.assistant}
+                  phx-click="toggle_assistant"
+                  phx-value-id={peer.id}
+                  phx-value-assistant={to_string(!peer.assistant)}
+                /> Assistant
+              </label>
               <button
                 phx-click="remove_peer"
                 phx-value-id={peer.id}

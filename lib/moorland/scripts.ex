@@ -97,6 +97,10 @@ defmodule Moorland.Scripts do
   defp effective_role(%Script{origin_public_key: nil}, role), do: role
 
   defp effective_role(%Script{origin_role: "viewer"}, _role), do: :viewer
+
+  defp effective_role(%Script{origin_role: "commenter"}, role) when role in [:owner, :editor],
+    do: :commenter
+
   defp effective_role(%Script{}, role) when role in [:owner, :editor], do: :editor
   defp effective_role(%Script{}, role), do: role
 
@@ -1099,10 +1103,17 @@ defmodule Moorland.Scripts do
     end
   end
 
-  @doc "Applies comments, notes, breakdown tags, snapshots and deletions pushed by an editor peer."
+  @doc """
+  Applies activity pushed by a peer. An editor peer may push comments,
+  notes, breakdown tags, snapshots, the stripboard and deletions; a
+  commenter peer only comments, notes, tags and deletions of its own.
+  """
   def peer_apply_activity(public_key, script_id, payload) when is_map(payload) do
     case peer_share_for(public_key, script_id) do
-      %PeerShare{role: "editor"} ->
+      %PeerShare{role: role} when role in ["editor", "commenter"] ->
+        payload =
+          if role == "commenter", do: Map.drop(payload, ["versions", "schedule"]), else: payload
+
         peer = Moorland.Peers.get_by_public_key(public_key)
         Activity.apply_from_peer(peer, Repo.get!(Script, script_id), payload)
         {:ok, %{ok: true}}
@@ -1388,7 +1399,8 @@ defmodule Moorland.Scripts do
     for row <- rows do
       Phoenix.PubSub.broadcast(Moorland.PubSub, "user:#{row.user_id}", :notifications_changed)
 
-      if row.kind == "mention" do
+      # An assistant's @mentions notify in the app but never send email.
+      if row.kind == "mention" and not Map.get(comment, :from_assistant, false) do
         member = Enum.find(members, &(&1.id == row.user_id))
         Moorland.Scripts.MentionNotifier.deliver(member, script, comment)
       end
@@ -1399,8 +1411,12 @@ defmodule Moorland.Scripts do
 
   ## Helpers
 
+  # Writing to a mirror is held to the role its origin granted, so a viewer
+  # or commenter mirror refuses edits here too, not only in the editor's UI.
+  # Viewing and managing (deleting the local copy) stay with the local role.
   defp authorize(scope, script, action) do
-    r = role(scope, script)
+    local = role(scope, script)
+    r = if action in [:edit, :comment], do: effective_role(script, local), else: local
 
     allowed? =
       case action do

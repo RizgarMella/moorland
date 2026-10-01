@@ -62,6 +62,19 @@ defmodule Moorland.PeersTest do
       assert {:error, :own_code} = Peers.add_peer(scope, Peers.peer_code(), "Me")
       assert {:error, :invalid_code} = Peers.add_peer(scope, "nope", "X")
     end
+
+    test "only the user who added a peer may mark or remove it", %{scope: scope} do
+      %{public: pub} = Crypto.generate_keypair()
+      {:ok, peer} = Peers.add_peer(scope, Crypto.format_code(pub, "10.0.0.8", 4000), "Bot")
+      other = Scope.for_user(user_fixture())
+
+      assert {:error, :not_found} = Peers.set_assistant(other, peer.id, true)
+      assert {:error, :not_found} = Peers.remove_peer(other, peer.id)
+      assert {:error, :not_found} = Peers.remove_peer(scope, "nope")
+
+      assert {:ok, %{assistant: true}} = Peers.set_assistant(scope, to_string(peer.id), true)
+      assert {:ok, _} = Peers.remove_peer(scope, peer.id)
+    end
   end
 
   describe "peer sharing and peer saves (origin side)" do

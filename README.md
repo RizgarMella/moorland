@@ -141,6 +141,10 @@ Moorland installations link to each other directly.
 - **Private by construction.** Everything between installations is end to
   end encrypted and signed. Only peers you have added are served, and nothing
   about a script crosses the wire in the clear.
+- **Commenter peers and AI assistants.** Share a script with a peer as
+  Commenter and it can comment, add notes and tag the breakdown, but never
+  change the text. Mark a peer as an assistant and everything it writes is
+  badged AI, and its @mentions never send email.
 - Works on a local network, over a VPN such as Tailscale, through a
   forwarded port, or across the open internet.
 

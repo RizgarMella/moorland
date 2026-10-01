@@ -92,6 +92,23 @@ defmodule Moorland.BreakdownSyncTest do
     assert [%{kind: "sketch"}] = Scripts.list_notes(ctx.mirror)
   end
 
+  test "a commenter mirror comments and tags but cannot edit", ctx do
+    :ok = Scripts.set_peer_share(ctx.alice, ctx.origin, ctx.peer.id, "commenter")
+
+    {:ok, mirror} =
+      Scripts.apply_origin_content(ctx.mirror, "Shared Draft", @content, 1, "commenter")
+
+    assert {_s, :commenter} = Scripts.get_script!(ctx.bob, mirror.id)
+    assert {:error, :not_allowed} = Scripts.save_content(ctx.bob, mirror, "rewritten")
+
+    {:ok, _} = Scripts.create_comment(ctx.bob, mirror, %{body: "Lovely lamp"})
+    tag(ctx.bob, mirror, "Lamp", "brass lamp")
+    {:ok, _} = push(mirror, ctx.origin)
+
+    assert [%{body: "Lovely lamp"}] = Scripts.list_comments(ctx.origin)
+    assert names(ctx.origin) == ["Lamp"]
+  end
+
   test "the origin's tags arrive on the mirror under the author's handle", ctx do
     tag(ctx.alice, ctx.origin, "Brass lamp", "brass lamp")
     pull(ctx.mirror, ctx.origin)

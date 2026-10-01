@@ -112,10 +112,32 @@ defmodule Moorland.Peers do
     end
   end
 
-  def remove_peer(%Scope{}, peer_id) do
-    case Repo.get(Peer, peer_id) do
+  # Peer trust is per-user: only the user who added a peer may change it.
+  defp own_peer(%Scope{user: user}, peer_id) do
+    with {id, ""} <- Integer.parse(to_string(peer_id)),
+         %Peer{added_by_user_id: uid} = peer when uid == user.id <- Repo.get(Peer, id) do
+      peer
+    else
+      _ -> nil
+    end
+  end
+
+  def remove_peer(%Scope{} = scope, peer_id) do
+    case own_peer(scope, peer_id) do
       nil -> {:error, :not_found}
       peer -> Repo.delete(peer)
+    end
+  end
+
+  @doc """
+  Marks a peer as an AI assistant (or not). An assistant is an ordinary
+  peer; the mark badges its comments and notes and keeps its @mentions
+  from sending email.
+  """
+  def set_assistant(%Scope{} = scope, peer_id, assistant?) when is_boolean(assistant?) do
+    case own_peer(scope, peer_id) do
+      nil -> {:error, :not_found}
+      peer -> peer |> Ecto.Changeset.change(assistant: assistant?) |> Repo.update()
     end
   end
 

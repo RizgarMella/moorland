@@ -17,6 +17,7 @@ defmodule Moorland.Scripts.Note do
     field :peer_key, :binary
     field :rev, :integer, default: 1
     field :synced_rev, :integer, default: 0
+    field :from_assistant, :boolean, default: false
 
     belongs_to :script, Moorland.Scripts.Script
     belongs_to :author, Moorland.Accounts.User

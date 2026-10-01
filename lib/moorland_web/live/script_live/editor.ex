@@ -706,6 +706,18 @@ defmodule MoorlandWeb.ScriptLive.Editor do
   defp author_label(%{author: %{email: email}}) when is_binary(email), do: email
   defp author_label(_record), do: "someone"
 
+  # Marks what an AI assistant peer wrote, wherever it is shown.
+  defp assistant_badge(assigns) do
+    ~H"""
+    <span
+      class="ml-1 rounded bg-primary/15 px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-primary"
+      title="Written by an AI assistant connected as a peer"
+    >
+      AI
+    </span>
+    """
+  end
+
   defp role_label(:owner), do: "Owner"
   defp role_label(role), do: role |> to_string() |> String.capitalize()
 
@@ -1202,6 +1214,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
           <div class="flex items-start justify-between gap-2">
             <div class="min-w-0">
               <span class="text-xs font-semibold">{author_label(comment)}</span>
+              <.assistant_badge :if={comment.from_assistant} />
               <span
                 :if={comment.remote_author}
                 class="ml-1 text-[10px] text-base-content/40"
@@ -1251,6 +1264,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
 
           <div :for={reply <- comment.replies} class="mt-2 border-l-2 border-base-300 pl-3">
             <span class="text-xs font-semibold">{author_label(reply)}</span>
+            <.assistant_badge :if={reply.from_assistant} />
             <span
               :if={reply.remote_author}
               class="ml-1 text-[10px] text-base-content/40"
@@ -1372,9 +1386,8 @@ defmodule MoorlandWeb.ScriptLive.Editor do
         >
           <div class="flex items-start justify-between gap-2">
             <span class="text-[11px] font-semibold text-base-content/60">
-              {author_label(note)}{if note.remote_author, do: " (via peer)"} · {time_ago(
-                note.updated_at
-              )}
+              {author_label(note)}<.assistant_badge :if={note.from_assistant} />{if note.remote_author,
+                do: " (via peer)"} · {time_ago(note.updated_at)}
             </span>
             <div class="flex shrink-0 gap-1">
               <button
@@ -2070,6 +2083,9 @@ defmodule MoorlandWeb.ScriptLive.Editor do
               <select name="role" class="select select-bordered select-xs">
                 <option value="" selected={!Map.has_key?(@peer_shares, peer.id)}>Not shared</option>
                 <option value="editor" selected={@peer_shares[peer.id] == "editor"}>Editor</option>
+                <option value="commenter" selected={@peer_shares[peer.id] == "commenter"}>
+                  Commenter
+                </option>
                 <option value="viewer" selected={@peer_shares[peer.id] == "viewer"}>Viewer</option>
               </select>
             </form>

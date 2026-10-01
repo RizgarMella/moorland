@@ -2,7 +2,9 @@ defmodule Moorland.Scripts.PeerShare do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @roles ~w(editor viewer)
+  # A commenter peer (an AI assistant, say) adds comments, notes and tags
+  # but never changes the text.
+  @roles ~w(editor commenter viewer)
 
   schema "script_peer_shares" do
     field :role, :string, default: "editor"

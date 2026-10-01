@@ -9,6 +9,7 @@ defmodule Moorland.Peers.Peer do
     field :port, :integer
     field :last_seen_at, :utc_datetime
     field :last_error, :string
+    field :assistant, :boolean, default: false
 
     belongs_to :added_by, Moorland.Accounts.User, foreign_key: :added_by_user_id
 
