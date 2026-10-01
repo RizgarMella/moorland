@@ -149,7 +149,8 @@ locations, and a dialogue balance line from optional gender tags.
   as productions number them (12A, 12B), carry size, angle, movement, lens
   and a description, stay with their words through rewrites, and print as
   a clean list. Give any shot a storyboard frame and the printed list
-  becomes a storyboard (frames stay on your machine for now).
+  becomes a storyboard; frames travel to linked installations with their
+  shots (up to 3 MB each).
 
 ### Stripboard
 

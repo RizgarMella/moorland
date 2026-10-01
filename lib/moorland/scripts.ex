@@ -835,8 +835,8 @@ defmodule Moorland.Scripts do
 
   @doc """
   Gives a shot its storyboard frame, copied from `source` (an uploaded
-  temp file) into the data folder; any earlier frame is removed. Images
-  stay on this installation: they do not travel to peers.
+  temp file) into the data folder; any earlier frame is removed. Frames up
+  to 3 MB travel to peers with their shot (see Activity).
   """
   def attach_shot_image(%Scope{} = scope, %Script{} = script, shot_id, source, ext) do
     ext = String.downcase(ext)
@@ -850,7 +850,7 @@ defmodule Moorland.Scripts do
       remove_image_file(script, shot)
 
       shot
-      |> Ecto.Changeset.change(image: name)
+      |> Ecto.Changeset.change(image: name, rev: shot.rev + 1)
       |> Repo.update()
       |> tap_shots(script)
     end
@@ -859,7 +859,11 @@ defmodule Moorland.Scripts do
   def remove_shot_image(%Scope{} = scope, %Script{} = script, shot_id) do
     with %Shot{} = shot <- own_shot(scope, script, shot_id) do
       remove_image_file(script, shot)
-      shot |> Ecto.Changeset.change(image: nil) |> Repo.update() |> tap_shots(script)
+
+      shot
+      |> Ecto.Changeset.change(image: nil, rev: shot.rev + 1)
+      |> Repo.update()
+      |> tap_shots(script)
     end
   end
 
@@ -1502,6 +1506,18 @@ defmodule Moorland.Scripts do
     case peer_share_for(public_key, script_id) do
       %PeerShare{} -> {:ok, Activity.for_peer(Repo.get!(Script, script_id), after_version_id)}
       nil -> {:error, :not_shared}
+    end
+  end
+
+  @doc "A shot's storyboard frame for a peer the script is shared with."
+  def peer_media(public_key, script_id, shot_uid) do
+    with %PeerShare{} <- peer_share_for(public_key, script_id),
+         %Shot{image: name} when is_binary(name) <-
+           Repo.get_by(Shot, script_id: script_id, uid: to_string(shot_uid)),
+         {:ok, data} <- File.read(Path.join(Moorland.Storage.media_dir(script_id), name)) do
+      {:ok, %{name: name, data: Base.encode64(data)}}
+    else
+      _ -> {:error, :not_found}
     end
   end
 

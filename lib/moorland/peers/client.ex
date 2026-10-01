@@ -34,6 +34,11 @@ defmodule Moorland.Peers.Client do
     call(peer, "activity_push", %{id: origin_script_id, activity: activity})
   end
 
+  @doc "A shot's storyboard frame from the origin: name and base64 data."
+  def fetch_media(%Peer{} = peer, origin_script_id, shot_uid) do
+    call(peer, "media", %{id: origin_script_id, uid: shot_uid})
+  end
+
   @doc "Fire-and-forget 'something changed, sync when you like' ping."
   def notify(%Peer{} = peer), do: call(peer, "notify", %{})
 

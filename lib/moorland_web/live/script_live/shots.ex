@@ -344,7 +344,7 @@ defmodule MoorlandWeb.ScriptLive.Shots do
           phx-click="pick_image"
           phx-value-id={@shot.id}
           class="flex aspect-video w-32 items-center justify-center rounded border border-dashed border-base-300 text-[11px] text-base-content/50 transition hover:border-base-content/40 hover:text-base-content print:hidden"
-          title="Add a storyboard frame (stays on this installation)"
+          title="Add a storyboard frame (frames up to 3 MB reach linked installations too)"
         >
           <.icon name="hero-photo" class="mr-1 size-3.5" /> Frame
         </button>

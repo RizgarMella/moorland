@@ -146,6 +146,27 @@ defmodule MoorlandWeb.PeerApiControllerTest do
     assert {404, _} = call(conn, remote, "activity", %{id: script.id + 1000, after: 0})
   end
 
+  test "storyboard frames are served to shared peers only", %{
+    conn: conn,
+    scope: scope,
+    script: script,
+    remote: remote
+  } do
+    {:ok, shot} = Scripts.create_shot(scope, script, %{line_no: 0})
+    tmp = Path.join(System.tmp_dir!(), "frame-#{System.unique_integer([:positive])}.png")
+    File.write!(tmp, "PNG!")
+    {:ok, _} = Scripts.attach_shot_image(scope, script, shot.id, tmp, ".png")
+
+    assert {200, %{"name" => name, "data" => data}} =
+             call(conn, remote, "media", %{id: script.id, uid: shot.uid})
+
+    assert Base.decode64!(data) == "PNG!" and name =~ ~r/^shot-.+\.png$/
+    assert {404, _} = call(conn, remote, "media", %{id: script.id, uid: "nope"})
+
+    {:ok, private} = Scripts.create_script(scope, %{title: "Private"})
+    assert {404, _} = call(conn, remote, "media", %{id: private.id, uid: shot.uid})
+  end
+
   test "strangers are refused even with a valid envelope", %{conn: conn} do
     keys = Crypto.generate_keypair()
     stranger = %{public_key: keys.public, private_key: keys.private}

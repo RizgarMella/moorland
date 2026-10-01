@@ -140,11 +140,24 @@ defmodule Moorland.Peers.Sync do
     if pushed? or stamp != mirror.origin_activity_stamp do
       cursor = Activity.version_cursor(mirror)
 
-      with {:ok, data} <- Client.fetch_activity(peer, mirror.origin_script_id, cursor) do
-        Activity.apply_from_origin(mirror, data)
+      with {:ok, data} <- Client.fetch_activity(peer, mirror.origin_script_id, cursor),
+           {:ok, mirror} <- Activity.apply_from_origin(mirror, data) do
+        fetch_missing_media(peer, mirror)
+        {:ok, mirror}
       end
     else
       {:ok, mirror}
+    end
+  end
+
+  # Storyboard frames named by the origin but not here yet. One failure
+  # (an origin that has since dropped the frame) does not stop the rest.
+  defp fetch_missing_media(peer, mirror) do
+    for uid <- Activity.missing_media(mirror) do
+      case Client.fetch_media(peer, mirror.origin_script_id, uid) do
+        {:ok, reply} -> Activity.store_media(mirror, uid, reply)
+        _ -> :skip
+      end
     end
   end
 

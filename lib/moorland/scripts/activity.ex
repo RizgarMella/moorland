@@ -231,9 +231,14 @@ defmodule Moorland.Scripts.Activity do
     shots? =
       Enum.reduce(list(payload, "shots"), false, fn item, acc ->
         case find(Shot, script.id, item["uid"]) do
-          nil -> insert_shot(script, item, key, :origin) == :ok or acc
-          %Shot{peer_key: ^key} = existing -> apply_shot_fields(existing, item, :origin) or acc
-          %Shot{} -> acc
+          nil ->
+            insert_shot(script, item, key, :origin) == :ok or acc
+
+          %Shot{peer_key: ^key} = existing ->
+            apply_shot_fields(script, existing, item, :origin) or acc
+
+          %Shot{} ->
+            acc
         end
       end)
 
@@ -434,7 +439,9 @@ defmodule Moorland.Scripts.Activity do
         comments: Enum.map(comments, &comment_payload/1),
         notes: Enum.map(notes, &note_payload/1),
         tags: Enum.map(tags, &tag_payload/1),
-        shots: Enum.map(shots, &shot_payload/1),
+        # A mirror's own frames travel with its shots (see shot_image_data/2).
+        shots:
+          Enum.map(shots, &Map.put(shot_payload(&1), :image_data, shot_image_data(mirror, &1))),
         tasks: Enum.map(tasks, &task_payload/1),
         revision_sets: Enum.map(revision_sets, &revision_payload/1),
         schedule: if(schedule_rev, do: schedule_payload(mirror.id)),
@@ -623,7 +630,7 @@ defmodule Moorland.Scripts.Activity do
               %Shot{} = existing ->
                 if pending?(existing),
                   do: acc,
-                  else: apply_shot_fields(existing, item, :mirror) or acc
+                  else: apply_shot_fields(mirror, existing, item, :mirror) or acc
             end
           end)
 
@@ -971,6 +978,98 @@ defmodule Moorland.Scripts.Activity do
 
   defp schedule_changeset(_record, _item, _position), do: nil
 
+  ## Storyboard frames
+  #
+  # A shot's frame travels by name; names are unique per upload, so a name
+  # this side lacks is a new picture. The origin sends bytes on request (the
+  # "media" op); a mirror sends its own frames inline with the shot, up to
+  # @max_synced_frame bytes (larger frames stay where they were made).
+
+  @max_synced_frame 3_000_000
+  @frame_name ~r/\Ashot-[A-Za-z0-9-]+\.(jpg|jpeg|png|webp)\z/
+
+  defp shot_image_data(script, %Shot{image: name}) when is_binary(name) do
+    path = Path.join(Moorland.Storage.media_dir(script.id), name)
+
+    case File.stat(path) do
+      {:ok, %{size: size}} when size <= @max_synced_frame -> Base.encode64(File.read!(path))
+      _ -> nil
+    end
+  end
+
+  defp shot_image_data(_script, _shot), do: nil
+
+  # Brings a shot's frame in line with the item: a new name with bytes is
+  # written; a new name without bytes waits for missing_media/1 to fetch it;
+  # no name removes the frame.
+  defp sync_frame(script, %Shot{} = shot, item) do
+    name = item["image"]
+
+    cond do
+      not Map.has_key?(item, "image") ->
+        shot
+
+      name == shot.image ->
+        shot
+
+      is_nil(name) ->
+        drop_frame(script, shot)
+        shot |> Ecto.Changeset.change(image: nil) |> Repo.update!()
+
+      is_binary(name) and Regex.match?(@frame_name, name) ->
+        with data when is_binary(data) <- item["image_data"],
+             {:ok, bytes} <- Base.decode64(data),
+             true <- byte_size(bytes) <= @max_synced_frame do
+          write_frame(script, name, bytes)
+        end
+
+        drop_frame(script, shot)
+        shot |> Ecto.Changeset.change(image: name) |> Repo.update!()
+
+      true ->
+        shot
+    end
+  end
+
+  defp write_frame(script, name, bytes) do
+    dir = Moorland.Storage.media_dir(script.id)
+    File.mkdir_p!(dir)
+    File.write!(Path.join(dir, name), bytes)
+  end
+
+  defp drop_frame(script, %Shot{image: name}) when is_binary(name),
+    do: File.rm(Path.join(Moorland.Storage.media_dir(script.id), name))
+
+  defp drop_frame(_script, _shot), do: :ok
+
+  @doc "Shots on this mirror whose frame has not arrived yet: `[uid]`."
+  def missing_media(%Script{} = mirror) do
+    dir = Moorland.Storage.media_dir(mirror.id)
+
+    from(s in Shot,
+      where: s.script_id == ^mirror.id and not is_nil(s.image),
+      select: {s.uid, s.image}
+    )
+    |> Repo.all()
+    |> Enum.reject(fn {_uid, name} -> File.exists?(Path.join(dir, name)) end)
+    |> Enum.map(&elem(&1, 0))
+  end
+
+  @doc "Stores a frame fetched from the origin, if it is still the shot's frame."
+  def store_media(%Script{} = mirror, uid, %{"name" => name, "data" => data}) do
+    with %Shot{image: ^name} <- find(Shot, mirror.id, uid),
+         true <- Regex.match?(@frame_name, name),
+         {:ok, bytes} <- Base.decode64(data) do
+      write_frame(mirror, name, bytes)
+      Scripts.broadcast(mirror.id, {:shots_changed, mirror.id})
+      :ok
+    else
+      _ -> :skip
+    end
+  end
+
+  def store_media(_mirror, _uid, _reply), do: :skip
+
   defp insert_shot(script, item, peer_key, side) do
     if is_binary(item["uid"]) do
       %Shot{
@@ -984,19 +1083,27 @@ defmodule Moorland.Scripts.Activity do
       |> Ecto.Changeset.change(arrival_changes(side))
       |> then(&if(&1.valid?, do: Repo.insert(&1, on_conflict: :nothing), else: :skip))
       |> case do
-        {:ok, %Shot{id: id}} when is_integer(id) -> :ok
-        _ -> :skip
+        {:ok, %Shot{id: id} = shot} when is_integer(id) ->
+          sync_frame(script, shot, item)
+          :ok
+
+        _ ->
+          :skip
       end
     else
       :skip
     end
   end
 
-  defp apply_shot_fields(existing, item, side) do
+  defp apply_shot_fields(script, existing, item, side) do
     changeset = Shot.changeset(existing, shot_attrs(item))
+    frame_changed? = Map.has_key?(item, "image") and item["image"] != existing.image
 
-    if changeset.valid? and changeset.changes != %{} do
-      changeset |> Ecto.Changeset.change(update_changes(existing, side)) |> Repo.update!()
+    if changeset.valid? and (changeset.changes != %{} or frame_changed?) do
+      updated =
+        changeset |> Ecto.Changeset.change(update_changes(existing, side)) |> Repo.update!()
+
+      sync_frame(script, updated, item)
       true
     else
       false
@@ -1306,6 +1413,7 @@ defmodule Moorland.Scripts.Activity do
       movement: s.movement,
       lens: s.lens,
       description: s.description,
+      image: s.image,
       author: handle(s),
       inserted_at: iso(s.inserted_at)
     }

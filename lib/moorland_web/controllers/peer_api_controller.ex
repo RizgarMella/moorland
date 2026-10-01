@@ -71,6 +71,14 @@ defmodule MoorlandWeb.PeerApiController do
     end
   end
 
+  defp handle("media", %{"id" => id, "uid" => uid}, peer)
+       when is_integer(id) and is_binary(uid) do
+    case Scripts.peer_media(peer.public_key, id, uid) do
+      {:ok, payload} -> {200, payload}
+      {:error, _} -> {404, %{error: "not found"}}
+    end
+  end
+
   # A peer telling us they changed something: sync now instead of waiting
   # for the next poll. This is what makes peer edits feel close to live.
   defp handle("notify", _args, _peer) do

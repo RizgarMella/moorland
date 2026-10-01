@@ -209,7 +209,10 @@ it wrote; the origin's owner can delete anything and the next pull follows.
   WebP, 5 MB), uploaded on the shot list, kept under the data folder's
   `media/<script id>/` (moved with the folder, removed with the shot or
   script), served only to people who can open the script, and printed with
-  the shot list. Left: frames travelling to peers, and mood boards.
+  the shot list. *Frames sync (Oct 1 2026):* shots carry their frame's
+  name; a mirror fetches frames it lacks with the sealed `media` op and
+  sends its own inline with its shots, up to 3 MB each (the peer body
+  limit; bigger frames stay where they were made). Left: mood boards.
 - **Media library** [production] — shared reference files in the data folder,
   synced to production peers like scripts are.
 - **Production calendar & tasks** [production] — prep/shoot/post timeline and

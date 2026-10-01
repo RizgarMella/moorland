@@ -255,6 +255,93 @@ defmodule Moorland.BreakdownSyncTest do
     end
   end
 
+  describe "storyboard frames" do
+    defp frame_file(bytes) do
+      path = Path.join(System.tmp_dir!(), "frame-#{System.unique_integer([:positive])}.png")
+      File.write!(path, bytes)
+      path
+    end
+
+    defp frame(script) do
+      [shot | _] = Scripts.list_shots(script)
+      shot.image && File.read(Path.join(Moorland.Storage.media_dir(script.id), shot.image))
+    end
+
+    # What Sync does after a pull: fetch frames the mirror is missing.
+    defp fetch_frames(mirror, origin) do
+      for uid <- Activity.missing_media(mirror) do
+        {:ok, reply} = Scripts.peer_media(peer_key(), origin.id, uid)
+        Activity.store_media(mirror, uid, wire(reply))
+      end
+    end
+
+    test "the origin's frame is named on pull and fetched after", ctx do
+      {:ok, shot} =
+        Scripts.create_shot(ctx.alice, ctx.origin, %{anchor_text: "brass lamp", line_no: 2})
+
+      {:ok, _} =
+        Scripts.attach_shot_image(ctx.alice, ctx.origin, shot.id, frame_file("PNGDATA"), ".png")
+
+      mirror = pull(ctx.mirror, ctx.origin)
+      assert [%{image: name}] = Scripts.list_shots(mirror)
+      assert is_binary(name)
+      assert Activity.missing_media(mirror) == [shot.uid]
+
+      fetch_frames(mirror, ctx.origin)
+      assert frame(mirror) == {:ok, "PNGDATA"}
+      assert Activity.missing_media(mirror) == []
+
+      # Removed at the origin, removed here.
+      {:ok, _} = Scripts.remove_shot_image(ctx.alice, ctx.origin, shot.id)
+      pull(mirror, ctx.origin)
+      assert [%{image: nil}] = Scripts.list_shots(mirror)
+    end
+
+    test "a mirror's own frame travels inline with its shot", ctx do
+      {:ok, shot} =
+        Scripts.create_shot(ctx.bob, ctx.mirror, %{anchor_text: "grandfather clock", line_no: 2})
+
+      {:ok, _} =
+        Scripts.attach_shot_image(ctx.bob, ctx.mirror, shot.id, frame_file("JPEGDATA"), ".jpg")
+
+      {:ok, _} = push(ctx.mirror, ctx.origin)
+      assert frame(ctx.origin) == {:ok, "JPEGDATA"}
+
+      # Pulled back, nothing is fetched twice.
+      mirror = pull(ctx.mirror, ctx.origin)
+      assert Activity.missing_media(mirror) == []
+    end
+
+    test "frames over the size limit stay where they were made", ctx do
+      {:ok, shot} =
+        Scripts.create_shot(ctx.bob, ctx.mirror, %{anchor_text: "grandfather clock", line_no: 2})
+
+      big = :binary.copy("x", 3_100_000)
+      {:ok, _} = Scripts.attach_shot_image(ctx.bob, ctx.mirror, shot.id, frame_file(big), ".png")
+
+      {:ok, _} = push(ctx.mirror, ctx.origin)
+      [origin_shot] = Scripts.list_shots(ctx.origin)
+      assert is_binary(origin_shot.image)
+      assert {:error, :enoent} = frame(ctx.origin)
+    end
+
+    test "names that are not frame names are ignored", ctx do
+      payload = %{
+        "shots" => [
+          %{
+            "uid" => "evil",
+            "line_no" => 0,
+            "image" => "../../etc/passwd",
+            "image_data" => Base.encode64("x")
+          }
+        ]
+      }
+
+      {:ok, _} = Scripts.peer_apply_activity(peer_key(), ctx.origin.id, payload)
+      assert [%{image: nil}] = Scripts.list_shots(ctx.origin)
+    end
+  end
+
   test "the origin's tags arrive on the mirror under the author's handle", ctx do
     tag(ctx.alice, ctx.origin, "Brass lamp", "brass lamp")
     pull(ctx.mirror, ctx.origin)
