@@ -185,6 +185,14 @@ defmodule MoorlandWeb.ScriptLive.Breakdown do
             <.icon name="hero-video-camera" class="size-4" /><span class="hidden sm:inline">Shots</span>
           </.link>
           <.link
+            id="open-production"
+            navigate={~p"/scripts/#{@script.id}/production"}
+            class="btn btn-ghost btn-sm"
+            title="Tasks and calendar"
+          >
+            <.icon name="hero-clipboard-document-check" class="size-4" /><span class="hidden sm:inline">Production</span>
+          </.link>
+          <.link
             id="open-schedule"
             navigate={~p"/scripts/#{@script.id}/schedule"}
             class="btn btn-ghost btn-sm"

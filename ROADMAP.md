@@ -185,6 +185,13 @@ it wrote; the origin's owner can delete anything and the next pull follows.
   synced to production peers like scripts are.
 - **Production calendar & tasks** [production] — prep/shoot/post timeline and
   a simple assignable task board.
+  *Shipped (Oct 1 2026):* `/scripts/:id/production`. `ProductionTask`s
+  (title, prep/shoot/post phase, to do/doing/done, assignee by name, due
+  date, optional start date for a span) on a three-column board with
+  overdue flags, and a month calendar of spans, due dates and the
+  stripboard's dated shoot days. Commenters add and move tasks; author or
+  editor change them. Synced like shots, except a peer may move anyone's
+  task along the board.
 - **Day-out-of-days + call sheets** [production] — the cast-by-day grid
   derived from stripboard + breakdown, then per-day call sheets (schedule,
   call times, locations with map/weather, attachments) distributed via peer

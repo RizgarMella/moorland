@@ -31,7 +31,8 @@ defmodule Moorland.Scripts do
     RevisionSet,
     Schedule,
     ScheduleItem,
-    Shot
+    Shot,
+    ProductionTask
   }
 
   @auto_snapshot_interval_seconds 10 * 60
@@ -849,6 +850,84 @@ defmodule Moorland.Scripts do
   end
 
   defp tap_shots(result, _script), do: result
+
+  ## Production tasks
+
+  def list_tasks(%Script{} = script) do
+    from(t in ProductionTask,
+      where: t.script_id == ^script.id,
+      order_by: [asc_nulls_last: t.due_on, asc: t.id]
+    )
+    |> Repo.all()
+  end
+
+  @doc "Adds a task. Anyone who may comment may: crews coordinate here."
+  def create_task(%Scope{user: user} = scope, %Script{} = script, attrs) do
+    with :ok <- authorize(scope, script, :comment) do
+      %ProductionTask{script_id: script.id, author_id: user.id}
+      |> ProductionTask.changeset(stringify(attrs))
+      |> Repo.insert()
+      |> tap_tasks(script)
+    end
+  end
+
+  @doc "Moves a task on the board. Anyone who may comment may."
+  def set_task_status(%Scope{} = scope, %Script{} = script, task_id, status) do
+    with :ok <- authorize(scope, script, :comment),
+         %ProductionTask{script_id: sid} = task when sid == script.id <-
+           get_by_id(ProductionTask, task_id) do
+      task
+      |> ProductionTask.changeset(%{"status" => status})
+      |> Ecto.Changeset.put_change(:rev, task.rev + 1)
+      |> Repo.update()
+      |> tap_tasks(script)
+    else
+      nil -> {:error, :not_found}
+      %ProductionTask{} -> {:error, :not_found}
+      error -> error
+    end
+  end
+
+  @doc "Changes a task's details: its author, or anyone who may edit."
+  def update_task(%Scope{} = scope, %Script{} = script, task_id, attrs) do
+    with %ProductionTask{} = task <- own_task(scope, script, task_id) do
+      task
+      |> ProductionTask.changeset(
+        Map.take(stringify(attrs), ~w(title phase status assignee starts_on due_on))
+      )
+      |> Ecto.Changeset.put_change(:rev, task.rev + 1)
+      |> Repo.update()
+      |> tap_tasks(script)
+    end
+  end
+
+  def delete_task(%Scope{} = scope, %Script{} = script, task_id) do
+    with %ProductionTask{} = task <- own_task(scope, script, task_id) do
+      Activity.remember_deletion(script, "task", task)
+      Repo.delete(task) |> tap_tasks(script)
+      :ok
+    end
+  end
+
+  defp own_task(%Scope{user: user} = scope, script, task_id) do
+    case get_by_id(ProductionTask, task_id) do
+      %ProductionTask{script_id: sid} = task when sid == script.id ->
+        if task.author_id == user.id or :ok == authorize(scope, script, :edit),
+          do: task,
+          else: {:error, :not_allowed}
+
+      _ ->
+        {:error, :not_found}
+    end
+  end
+
+  defp tap_tasks({:ok, _} = result, script) do
+    broadcast(script.id, {:tasks_changed, script.id})
+    nudge_peers(script)
+    result
+  end
+
+  defp tap_tasks(result, _script), do: result
 
   ## Revision sets
 

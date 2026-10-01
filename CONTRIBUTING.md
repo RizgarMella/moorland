@@ -86,6 +86,7 @@ lib/moorland_web/
                                  drag and drop hook
   live/script_live/call_sheet.ex Printable call sheet for one shoot day
   live/script_live/shots.ex      Shot list
+  live/script_live/production.ex Task board and production calendar
   components/breakdown_components.ex  Breakdown panel and shared pieces
   components/revision_components.ex   Revision chip and History section
   live/peer_live/index.ex      Peers, storage, identity, update check

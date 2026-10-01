@@ -196,6 +196,14 @@ defmodule MoorlandWeb.ScriptLive.Schedule do
             <p class="mt-0.5 truncate text-sm text-base-content/60">{@script.title}</p>
           </div>
           <.link
+            id="open-production"
+            navigate={~p"/scripts/#{@script.id}/production"}
+            class="btn btn-ghost btn-sm"
+            title="Tasks and calendar"
+          >
+            <.icon name="hero-clipboard-document-check" class="size-4" /><span class="hidden sm:inline">Production</span>
+          </.link>
+          <.link
             navigate={~p"/scripts/#{@script.id}/breakdown"}
             class="btn btn-ghost btn-sm"
             title="Breakdown"

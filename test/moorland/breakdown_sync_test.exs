@@ -145,6 +145,41 @@ defmodule Moorland.BreakdownSyncTest do
     assert mirror |> Scripts.list_shots() |> Enum.map(& &1.size) == ["CU"]
   end
 
+  test "tasks travel both ways; peers may move anyone's, edit only their own", ctx do
+    {:ok, theirs} =
+      Scripts.create_task(ctx.alice, ctx.origin, %{
+        title: "Book the lighthouse",
+        due_on: ~D[2026-10-12]
+      })
+
+    {:ok, _mine} =
+      Scripts.create_task(ctx.bob, ctx.mirror, %{title: "Hire a boat", assignee: "Bob"})
+
+    {:ok, _} = push(ctx.mirror, ctx.origin)
+    mirror = pull(ctx.mirror, ctx.origin)
+
+    assert ctx.origin |> Scripts.list_tasks() |> Enum.map(& &1.title) |> Enum.sort() == [
+             "Book the lighthouse",
+             "Hire a boat"
+           ]
+
+    copy = Enum.find(Scripts.list_tasks(mirror), &(&1.uid == theirs.uid))
+    assert copy.due_on == ~D[2026-10-12]
+
+    # Bob moves Alice's task and renames it: the move sticks, the rename does not.
+    {:ok, _} = Scripts.set_task_status(ctx.bob, mirror, copy.id, "done")
+    copy = Enum.find(Scripts.list_tasks(mirror), &(&1.uid == theirs.uid))
+    Moorland.Repo.update!(Ecto.Changeset.change(copy, title: "Renamed", rev: copy.rev + 1))
+    {:ok, _} = push(mirror, ctx.origin)
+
+    at_origin = Enum.find(Scripts.list_tasks(ctx.origin), &(&1.uid == theirs.uid))
+    assert at_origin.status == "done" and at_origin.title == "Book the lighthouse"
+
+    :ok = Scripts.delete_task(ctx.alice, ctx.origin, theirs.id)
+    pull(mirror, ctx.origin)
+    assert mirror |> Scripts.list_tasks() |> Enum.map(& &1.title) == ["Hire a boat"]
+  end
+
   test "the origin's tags arrive on the mirror under the author's handle", ctx do
     tag(ctx.alice, ctx.origin, "Brass lamp", "brass lamp")
     pull(ctx.mirror, ctx.origin)

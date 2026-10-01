@@ -18,7 +18,8 @@ defmodule Moorland.Scripts.Activity do
   Trust on the origin side: a peer may add records and resolve any comment,
   but change or delete only records that arrived from that same peer.
 
-  Breakdown tags and shots travel like notes. An origin from before tags existed sends
+  Breakdown tags, shots and production tasks travel like notes (a peer may
+  move anyone's task along the board, as it may resolve anyone's comment). An origin from before tags existed sends
   no `"tags"` list at all, and a mirror then leaves its tags alone rather
   than reading the silence as "all deleted".
 
@@ -33,7 +34,17 @@ defmodule Moorland.Scripts.Activity do
   alias Moorland.Repo
   alias Moorland.Peers.Peer
   alias Moorland.Scripts
-  alias Moorland.Scripts.{BreakdownTag, Comment, Note, ScheduleItem, Script, Shot, Version}
+
+  alias Moorland.Scripts.{
+    BreakdownTag,
+    Comment,
+    Note,
+    ProductionTask,
+    ScheduleItem,
+    Script,
+    Shot,
+    Version
+  }
 
   # Mirrors push named snapshots and restore points; automatic snapshots are
   # local noise (the origin lays down its own on every merged save).
@@ -77,6 +88,14 @@ defmodule Moorland.Scripts.Activity do
         )
       )
 
+    {task_count, task_max} =
+      Repo.one(
+        from(t in ProductionTask,
+          where: t.script_id == ^script_id,
+          select: {count(t.id), max(t.updated_at)}
+        )
+      )
+
     {item_count, item_max} =
       Repo.one(
         from(i in ScheduleItem,
@@ -90,7 +109,7 @@ defmodule Moorland.Scripts.Activity do
 
     "c#{comment_count}@#{stamp_part(comment_max)}|n#{note_count}@#{stamp_part(note_max)}" <>
       "|t#{tag_count}@#{stamp_part(tag_max)}|s#{item_count}@#{stamp_part(item_max)}" <>
-      "|h#{shot_count}@#{stamp_part(shot_max)}" <>
+      "|h#{shot_count}@#{stamp_part(shot_max)}|k#{task_count}@#{stamp_part(task_max)}" <>
       "|v#{version_max || 0}"
   end
 
@@ -140,6 +159,7 @@ defmodule Moorland.Scripts.Activity do
       notes: Enum.map(notes, &note_payload/1),
       tags: Enum.map(tags, &tag_payload/1),
       shots: script.id |> all_shots() |> Enum.map(&shot_payload/1),
+      tasks: script.id |> all_tasks() |> Enum.map(&task_payload/1),
       schedule: schedule_payload(script.id),
       versions: Enum.map(versions, &version_payload/1)
     }
@@ -201,6 +221,20 @@ defmodule Moorland.Scripts.Activity do
         end
       end)
 
+    tasks? =
+      Enum.reduce(list(payload, "tasks"), false, fn item, acc ->
+        case find(ProductionTask, script.id, item["uid"]) do
+          nil ->
+            insert_task(script, item, key, :origin) == :ok or acc
+
+          %ProductionTask{peer_key: ^key} = existing ->
+            apply_task_fields(existing, item, :origin, :all) or acc
+
+          %ProductionTask{} = existing ->
+            apply_task_fields(existing, item, :origin, :status) or acc
+        end
+      end)
+
     versions? =
       Enum.reduce(list(payload, "versions"), false, fn item, acc ->
         if item["kind"] in @pushed_version_kinds and find(Version, script.id, item["uid"]) == nil,
@@ -217,6 +251,7 @@ defmodule Moorland.Scripts.Activity do
             "note" -> Note
             "breakdown_tag" -> BreakdownTag
             "shot" -> Shot
+            "task" -> ProductionTask
             _ -> nil
           end
 
@@ -229,12 +264,14 @@ defmodule Moorland.Scripts.Activity do
     notes_deleted? = Note in deleted
     tags_deleted? = BreakdownTag in deleted
     shots_deleted? = Shot in deleted
+    tasks_deleted? = ProductionTask in deleted
 
     changed =
       announce(script, comments? or comments_deleted?, notes? or notes_deleted?, versions?)
 
     changed = announce_tags(script, tags? or tags_deleted?) or changed
     changed = announce_shots(script, shots? or shots_deleted?) or changed
+    changed = announce_tasks(script, tasks? or tasks_deleted?) or changed
 
     changed =
       case payload["schedule"] do
@@ -327,6 +364,15 @@ defmodule Moorland.Scripts.Activity do
         )
       )
 
+    tasks =
+      Repo.all(
+        from(t in ProductionTask,
+          where: t.script_id == ^mirror.id and t.rev > t.synced_rev,
+          order_by: [asc: t.id],
+          preload: [:author]
+        )
+      )
+
     schedule_rev = pending_schedule_rev(mirror.id)
 
     %{
@@ -335,6 +381,7 @@ defmodule Moorland.Scripts.Activity do
         notes: Enum.map(notes, &note_payload/1),
         tags: Enum.map(tags, &tag_payload/1),
         shots: Enum.map(shots, &shot_payload/1),
+        tasks: Enum.map(tasks, &task_payload/1),
         schedule: if(schedule_rev, do: schedule_payload(mirror.id)),
         versions: Enum.map(versions, &version_payload/1),
         deletions: Enum.map(deletions, &Map.take(&1, [:kind, :uid]))
@@ -344,6 +391,7 @@ defmodule Moorland.Scripts.Activity do
         notes: Enum.map(notes, &{&1.id, &1.rev}),
         tags: Enum.map(tags, &{&1.id, &1.rev}),
         shots: Enum.map(shots, &{&1.id, &1.rev}),
+        tasks: Enum.map(tasks, &{&1.id, &1.rev}),
         schedule: if(schedule_rev, do: {mirror.id, schedule_rev}),
         versions: Enum.map(versions, & &1.id),
         deletions: Enum.map(deletions, & &1.id)
@@ -352,7 +400,8 @@ defmodule Moorland.Scripts.Activity do
   end
 
   def empty?(%{payload: p}) do
-    p.comments == [] and p.notes == [] and p.tags == [] and p.shots == [] and p.schedule == nil and
+    p.comments == [] and p.notes == [] and p.tags == [] and p.shots == [] and p.tasks == [] and
+      p.schedule == nil and
       p.versions == [] and p.deletions == []
   end
 
@@ -383,6 +432,11 @@ defmodule Moorland.Scripts.Activity do
 
     for {id, rev} <- Map.get(receipt, :tags, []) do
       from(t in BreakdownTag, where: t.id == ^id and t.rev == ^rev)
+      |> Repo.update_all(set: [synced_rev: rev])
+    end
+
+    for {id, rev} <- Map.get(receipt, :tasks, []) do
+      from(t in ProductionTask, where: t.id == ^id and t.rev == ^rev)
       |> Repo.update_all(set: [synced_rev: rev])
     end
 
@@ -517,6 +571,28 @@ defmodule Moorland.Scripts.Activity do
         false
       end
 
+    tasks? =
+      if is_list(data["tasks"]) do
+        task_items = list(data, "tasks")
+
+        changed? =
+          Enum.reduce(task_items, false, fn item, acc ->
+            case find(ProductionTask, mirror.id, item["uid"]) do
+              nil ->
+                insert_task(mirror, item, key, :mirror) == :ok or acc
+
+              %ProductionTask{} = existing ->
+                if pending?(existing),
+                  do: acc,
+                  else: apply_task_fields(existing, item, :mirror, :all) or acc
+            end
+          end)
+
+        delete_missing(ProductionTask, mirror.id, Enum.map(task_items, & &1["uid"])) or changed?
+      else
+        false
+      end
+
     schedule? =
       with items when is_list(items) <- data["schedule"],
            nil <- pending_schedule_rev(mirror.id) do
@@ -534,6 +610,7 @@ defmodule Moorland.Scripts.Activity do
     announce_tags(mirror, tags?)
     announce_schedule(mirror, schedule?)
     announce_shots(mirror, shots?)
+    announce_tasks(mirror, tasks?)
     {:ok, mirror}
   end
 
@@ -841,6 +918,71 @@ defmodule Moorland.Scripts.Activity do
     }
   end
 
+  defp insert_task(script, item, peer_key, side) do
+    if is_binary(item["uid"]) do
+      %ProductionTask{
+        script_id: script.id,
+        uid: item["uid"],
+        remote_author: handle_from(item),
+        peer_key: peer_key,
+        inserted_at: parse_time(item["inserted_at"])
+      }
+      |> ProductionTask.changeset(task_attrs(item))
+      |> Ecto.Changeset.change(arrival_changes(side))
+      |> then(&if(&1.valid?, do: Repo.insert(&1, on_conflict: :nothing), else: :skip))
+      |> case do
+        {:ok, %ProductionTask{id: id}} when is_integer(id) -> :ok
+        _ -> :skip
+      end
+    else
+      :skip
+    end
+  end
+
+  # `:status` takes only the board column: what a peer may change on
+  # someone else's task.
+  defp apply_task_fields(existing, item, side, which) do
+    attrs =
+      if which == :status, do: Map.take(task_attrs(item), ["status"]), else: task_attrs(item)
+
+    changeset = ProductionTask.changeset(existing, attrs)
+
+    if changeset.valid? and changeset.changes != %{} do
+      changeset |> Ecto.Changeset.change(update_changes(existing, side)) |> Repo.update!()
+      true
+    else
+      false
+    end
+  end
+
+  defp task_attrs(item) do
+    %{
+      "title" => clip(item["title"], 200),
+      "phase" => item["phase"],
+      "status" => item["status"],
+      "assignee" => if(is_binary(item["assignee"]), do: clip(item["assignee"], 80)),
+      "starts_on" => item["starts_on"],
+      "due_on" => item["due_on"]
+    }
+  end
+
+  defp all_tasks(script_id) do
+    Repo.all(
+      from(t in ProductionTask,
+        where: t.script_id == ^script_id,
+        order_by: [asc: t.id],
+        preload: [:author]
+      )
+    )
+  end
+
+  defp announce_tasks(script, true) do
+    Scripts.broadcast(script.id, {:tasks_changed, script.id})
+    true
+  end
+
+  defp announce_tasks(_script, false), do: false
+
   defp all_shots(script_id) do
     Repo.all(
       from(s in Shot, where: s.script_id == ^script_id, order_by: [asc: s.id], preload: [:author])
@@ -924,6 +1066,20 @@ defmodule Moorland.Scripts.Activity do
         cast_calls: i.cast_calls
       }
     end)
+  end
+
+  defp task_payload(t) do
+    %{
+      uid: t.uid,
+      title: t.title,
+      phase: t.phase,
+      status: t.status,
+      assignee: t.assignee,
+      starts_on: t.starts_on && Date.to_iso8601(t.starts_on),
+      due_on: t.due_on && Date.to_iso8601(t.due_on),
+      author: handle(t),
+      inserted_at: iso(t.inserted_at)
+    }
   end
 
   defp shot_payload(s) do

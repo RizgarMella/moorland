@@ -122,6 +122,14 @@ locations, and a dialogue balance line from optional gender tags.
   with its text. If the words are cut, the tag is flagged instead of lost.
 - **Spreadsheet export.** Download the whole breakdown as CSV.
 
+### Production office
+
+- **Tasks and calendar.** A board for prep, shoot and post (to do, doing,
+  done), with assignees and due dates, overdue tasks flagged, and a month
+  calendar showing spans like Prep or the edit, deadlines, and the shoot
+  days you dated on the stripboard. Crew with comment access add and move
+  tasks; the board syncs to every linked installation.
+
 ### Shot lists
 
 - **Plan shots on the words.** Highlight a moment in the preview and choose
