@@ -745,6 +745,98 @@ body.mo-typewriter [data-typewriter] {
   border-color: var(--color-base-content);
 }
 
+/* ---- Audio/visual (lesson) scripts ---------------------------------------- */
+
+/* Two columns, what is seen beside what is heard, ruled row by row. */
+.screenplay.av-doc {
+  max-width: 80ch;
+}
+
+.av-doc .av-head {
+  margin-bottom: 1.5rem;
+}
+
+.av-doc .av-title {
+  font-weight: 700;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.av-doc .av-objectives {
+  margin-top: 1rem;
+  font-size: 0.9em;
+}
+
+.av-doc .av-objectives ol {
+  margin: 0.25rem 0 0 1.5rem;
+  list-style: decimal;
+}
+
+.av-doc .av-label,
+.av-doc .av-colhead {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.av-doc .av-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  border-top: 1px solid var(--rule);
+}
+
+.av-doc .av-colhead {
+  padding: 0.35rem 0.75rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.av-doc .av-cell {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.av-doc .av-left {
+  border-right: 1px solid var(--rule);
+}
+
+.av-doc .av-part {
+  grid-column: 1 / -1;
+  padding: 0.75rem 0.75rem 0.35rem;
+  border-bottom: 1px solid var(--rule);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.av-doc .av-video + .av-video,
+.av-doc .av-audio + .av-audio {
+  margin-top: 0.4rem;
+}
+
+.av-doc .av-speaker {
+  display: block;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.av-doc .av-paren {
+  font-style: italic;
+  color: var(--muted);
+}
+
+@media print {
+  .print-screenplay.av-doc .av-grid,
+  .print-screenplay.av-doc .av-colhead,
+  .print-screenplay.av-doc .av-cell,
+  .print-screenplay.av-doc .av-part {
+    break-inside: avoid;
+    border-color: #000;
+  }
+}
+
 /* ---- Podcast scripts ------------------------------------------------------ */
 
 /* An audio script: each speaker's name in a left column beside their lines,

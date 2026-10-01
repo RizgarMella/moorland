@@ -22,6 +22,7 @@ import { fountainToFdx } from "./fdx"
 import { applyUI, autoHideHeader, typewriterOn } from "./ui_prefs"
 import { markTags } from "./breakdown_marks"
 import { renderProse, proseNavList, FRONT_MATTER_TEMPLATE } from "./prose"
+import { renderAV } from "./av"
 import { harvestNames, suggestNames } from "./prose_names"
 import { changedLines, markRevisions, labelRevisedPages } from "./revisions"
 
@@ -330,13 +331,16 @@ export const ScreenplayEditor = {
       (mark ? `<div class="print-watermark">${mark.replace(/[<>&"]/g, "")}</div>` : "") +
       (this.prose
         ? renderProse(this.textarea.value)
-        : this.pageLock
+        : this.el.dataset.kind === "lesson"
+          ? renderAV(this.textarea.value)
+          : this.pageLock
           ? renderHtml(this.textarea.value, { helpers: false, locks: this.locks() })
           : renderHtml(this.textarea.value, { helpers: false, paginate: false }))
     // Locked pages print with their own numbers (12A), a page per locked page.
     root.classList.toggle("print-locked", !!this.pageLock && !this.prose)
     root.classList.toggle("prose-doc", this.prose)
     root.classList.toggle("podcast-doc", this.el.dataset.kind === "podcast")
+    root.classList.toggle("av-doc", this.el.dataset.kind === "lesson")
     this.markRevised(root)
     root.dataset.revision = this.revision ? this.revision.label : ""
   },
@@ -684,9 +688,12 @@ export const ScreenplayEditor = {
     if (this.preview) {
       this.preview.classList.toggle("prose-doc", this.prose)
       this.preview.classList.toggle("podcast-doc", this.el.dataset.kind === "podcast")
+      this.preview.classList.toggle("av-doc", this.el.dataset.kind === "lesson")
       this.preview.innerHTML = this.prose
         ? renderProse(this.textarea.value, { helpers: this.canEdit })
-        : renderHtml(this.textarea.value, { helpers: this.canEdit, locks: this.locks() })
+        : this.el.dataset.kind === "lesson"
+          ? renderAV(this.textarea.value)
+          : renderHtml(this.textarea.value, { helpers: this.canEdit, locks: this.locks() })
       markTags(this.preview, this.breakdownTags)
       this.markRevised(this.preview)
     }

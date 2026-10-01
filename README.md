@@ -65,6 +65,9 @@ click from its line.
   script reads as an audio script, speaker beside each line, and Reports
   times every segment from its words (or its written length, for ads and
   music beds) against what you planned.
+- **Lessons and explainers.** A two-column audio/visual script, what we
+  see beside what we hear, with learning objectives up top and each part
+  timed by its narration.
 - **From idea to script.** Start a work as an idea and grow it stage by
   stage (short story, story, script), each stage its own document, linked
   in a strip above the editor. Starting the script turns every scene of the

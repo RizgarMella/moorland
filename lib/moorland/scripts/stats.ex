@@ -309,6 +309,11 @@ defmodule Moorland.Scripts.Stats do
   @doc "`compute/1` for a screenplay, `compute_prose/1` for prose, `compute_podcast/1` for a podcast."
   def compute_for(%{kind: "prose"}, text), do: compute_prose(text)
   def compute_for(%{kind: "podcast"}, text), do: compute_podcast(text)
+
+  # A lesson is timed like a podcast: narration at speaking pace, by part.
+  def compute_for(%{kind: "lesson"}, text),
+    do: text |> compute_podcast() |> Map.merge(%{podcast: false, lesson: true})
+
   def compute_for(_script, text), do: compute(text)
 
   defp strip_boneyard(text) do

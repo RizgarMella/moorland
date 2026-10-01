@@ -369,8 +369,12 @@ ships, and what is still open.
   segment from its dialogue at 150 words a minute, or by its `= 1:00`
   synopsis when silent (ads, music beds), shown in Reports against the
   planned length; an audio-script layout (speaker column beside the lines,
-  ruled segments) on screen and in print; shoot tools hidden. Left:
-  educational scripts and their two-column layout.
+  ruled segments) on screen and in print; shoot tools hidden.
+  *Educational scripts (Oct 1 2026):* `kind: "lesson"`, started from a
+  template with an `Objectives:` title-page entry; `av.js` lays the Fountain
+  out in two columns, action lines as VIDEO beside cued narration as AUDIO,
+  a row per run of visuals, `#` sections as parts; parts are timed like
+  podcast segments.
 - **Story-to-script pipeline** [pipeline] — one project carries a work from
   idea to short story to fleshed-out story to script, with collaborators,
   enterable at any stage (drop a whole story in), and with Moorland helping

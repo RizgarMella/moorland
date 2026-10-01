@@ -39,7 +39,10 @@ defmodule Moorland.Scripts.Script do
   podcast episodes in Fountain too, with hosts as cues and segments as
   sections.
   """
-  def kinds, do: ~w(screenplay prose podcast)
+  def kinds, do: ~w(screenplay prose podcast lesson)
+
+  def lesson?(%__MODULE__{kind: "lesson"}), do: true
+  def lesson?(_script), do: false
 
   def podcast?(%__MODULE__{kind: "podcast"}), do: true
   def podcast?(_script), do: false
@@ -77,6 +80,37 @@ defmodule Moorland.Scripts.Script do
 
     HOST
     Thanks for listening.
+    """
+  end
+
+  def template("lesson") do
+    """
+    Title: Lesson title
+    Objectives:
+        Name the three parts of a lighthouse
+        Explain why the lamp turns
+    Author: Your name
+
+    # Hook
+
+    A storm at sea. A single beam sweeps across the waves.
+
+    NARRATOR
+    For two hundred years, one light stood between sailors and the rocks.
+
+    # The parts
+
+    ON SCREEN: Diagram of a lighthouse, the lantern room highlighted.
+
+    NARRATOR
+    Every lighthouse has three parts: the tower, the lantern room, and the lamp.
+
+    # Recap
+
+    ON SCREEN: Key points, one at a time.
+
+    NARRATOR
+    So: a tall tower, a glass room, and a turning light.
     """
   end
 

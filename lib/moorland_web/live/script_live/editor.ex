@@ -908,12 +908,22 @@ defmodule MoorlandWeb.ScriptLive.Editor do
   end
 
   defp podcast?(script), do: Moorland.Scripts.Script.podcast?(script)
-  defp screenplay?(script), do: not prose?(script) and not podcast?(script)
+  defp lesson?(script), do: Moorland.Scripts.Script.lesson?(script)
+  defp screenplay?(script), do: script.kind == "screenplay"
 
   # 90 -> "1:30"
   defp clock(seconds) when is_integer(seconds),
     do:
       "#{div(seconds, 60)}:#{seconds |> rem(60) |> Integer.to_string() |> String.pad_leading(2, "0")}"
+
+  defp stat_tiles(%{lesson: true} = stats) do
+    [
+      {clock(stats.seconds), "est. runtime"},
+      {length(stats.segments), "parts"},
+      {length(stats.characters), "voices"},
+      {stats.words, "words"}
+    ]
+  end
 
   defp stat_tiles(%{podcast: true} = stats) do
     [
@@ -1261,7 +1271,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
           data-kind={@script.kind}
           data-can-lock-pages={
             to_string(
-              Scripts.can_edit?(@role) && is_nil(@script.origin_public_key) && !prose?(@script)
+              Scripts.can_edit?(@role) && is_nil(@script.origin_public_key) && screenplay?(@script)
             )
           }
           data-user-email={@current_scope.user.email}
@@ -2038,7 +2048,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
             prose?(@script) ->
               "A manuscript page is about 250 words; reading time assumes 230 words a minute."
 
-            podcast?(@script) ->
+            podcast?(@script) or lesson?(@script) ->
               "Runtime is spoken words at 150 a minute, plus the written length of silent segments."
 
             true ->
@@ -2163,7 +2173,11 @@ defmodule MoorlandWeb.ScriptLive.Editor do
 
         <div :if={@stats.characters != []} class="mt-5">
           <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/50">
-            {if podcast?(@script), do: "Speakers", else: "Speaking parts"}
+            {cond do
+              podcast?(@script) -> "Speakers"
+              lesson?(@script) -> "Voices"
+              true -> "Speaking parts"
+            end}
           </h3>
           <% max_words = @stats.characters |> Enum.map(& &1.words) |> Enum.max() |> max(1) %>
           <div class="mt-2 space-y-2">
@@ -2221,7 +2235,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
 
         <div :if={@stats[:segments] not in [nil, []]} id="podcast-segments" class="mt-5">
           <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/50">
-            Segments
+            {if @stats[:lesson], do: "Parts", else: "Segments"}
           </h3>
           <table class="mt-2 w-full text-xs">
             <tbody class="divide-y divide-base-200">
