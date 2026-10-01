@@ -20,6 +20,9 @@ jobs:
   build:
     name: ${{ matrix.target }}
     runs-on: ubuntu-latest
+    env:
+      # Secrets cannot appear in `if:`; this says whether there is one.
+      HAS_RELEASE_KEY: ${{ secrets.MOORLAND_RELEASE_KEY != '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -77,10 +80,20 @@ jobs:
           mix assets.deploy
           mix release moorland --overwrite
 
+      # Packaged copies install an update only if its signature checks out
+      # against the public key they carry (:release_public_key). Without the
+      # secret the build still publishes; copies then offer a download link.
+      - name: Sign the build
+        if: env.HAS_RELEASE_KEY == 'true'
+        env:
+          MIX_ENV: prod
+          MOORLAND_RELEASE_KEY: ${{ secrets.MOORLAND_RELEASE_KEY }}
+        run: mix moorland.sign burrito_out/${{ matrix.artifact }}
+
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: burrito_out/${{ matrix.artifact }}
+          path: burrito_out/${{ matrix.artifact }}*
           if-no-files-found: error
 
   release:

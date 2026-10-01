@@ -24,6 +24,13 @@ config :moorland,
   ecto_repos: [Moorland.Repo],
   generators: [timestamp_type: :utc_datetime]
 
+# The public half of the release signing key. Packaged builds install an
+# update only when its download is signed by the matching private key
+# (`mix moorland.release_key` makes a pair; the private half is the
+# MOORLAND_RELEASE_KEY secret the release workflow signs with). Left nil,
+# updates are downloaded by hand. MOORLAND_UPDATE_KEY overrides it.
+config :moorland, :release_public_key, nil
+
 # Configure the endpoint
 config :moorland, MoorlandWeb.Endpoint,
   url: [host: "localhost"],

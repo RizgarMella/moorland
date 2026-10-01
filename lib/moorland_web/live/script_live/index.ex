@@ -7,11 +7,13 @@ defmodule MoorlandWeb.ScriptLive.Index do
   def mount(_params, _session, socket) do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Moorland.PubSub, "user:#{socket.assigns.current_scope.user.id}")
+      Moorland.Updates.subscribe()
     end
 
     {:ok,
      socket
      |> assign(search_q: "", results: nil)
+     |> MoorlandWeb.UpdateComponents.assign_updates()
      |> allow_upload(:pdf,
        accept: ~w(.pdf),
        max_entries: 1,
@@ -25,6 +27,11 @@ defmodule MoorlandWeb.ScriptLive.Index do
   @impl true
   def handle_info(:notifications_changed, socket) do
     {:noreply, refresh(socket)}
+  end
+
+  def handle_info({:update_install, install}, socket) do
+    {:noreply,
+     assign(socket, :install, install) |> assign(:previous_build, Moorland.Updates.previous?())}
   end
 
   def handle_info(_msg, socket), do: {:noreply, socket}
@@ -76,6 +83,10 @@ defmodule MoorlandWeb.ScriptLive.Index do
   end
 
   def handle_event("validate_pdf", _params, socket), do: {:noreply, socket}
+
+  def handle_event(event, params, socket)
+      when event in ["install_update", "restart_app", "rollback_update"],
+      do: MoorlandWeb.UpdateComponents.handle_update_event(event, params, socket)
 
   def handle_event("import_failed", %{"reason" => reason}, socket) do
     {:noreply, put_flash(socket, :error, String.slice(to_string(reason), 0, 200))}
@@ -261,7 +272,19 @@ defmodule MoorlandWeb.ScriptLive.Index do
             <button type="button" data-toggle-versions class="btn btn-ghost btn-xs ml-auto shrink-0">
               Versions
             </button>
+            <button
+              :if={@self_install == :ok}
+              id="install-latest"
+              type="button"
+              phx-click="install_update"
+              phx-value-tag={@update.latest.tag}
+              class="btn btn-neutral btn-xs shrink-0"
+              title="Download, check its signature and install; it runs from the next start"
+            >
+              Install {@update.latest.tag}
+            </button>
             <a
+              :if={@self_install != :ok}
               href={@update.latest.url}
               target="_blank"
               rel="noopener"
@@ -298,13 +321,34 @@ defmodule MoorlandWeb.ScriptLive.Index do
               <span :if={release.prerelease} class="text-[10px] text-warning">pre-release</span>
               <span class="ml-auto text-base-content/40">{release.date}</span>
               <a href={release.url} target="_blank" rel="noopener" class="underline">view</a>
+              <button
+                :if={@self_install == :ok && !release.current}
+                type="button"
+                phx-click="install_update"
+                phx-value-tag={release.tag}
+                data-confirm={
+                  if(Moorland.Updates.newer?(@update.current, release.tag),
+                    do:
+                      "Go back to #{release.tag}? Work you saved stays, but features added since may go quiet.",
+                    else: nil
+                  )
+                }
+                class="underline"
+              >
+                install
+              </button>
             </div>
             <p class="pt-1 text-[11px] text-base-content/50">
-              Pick any version above — until packaged builds land, updating means pulling that
-              release and restarting Moorland.
+              {if @self_install == :ok,
+                do:
+                  "Install any version above: it is downloaded, its signature checked, and it runs from the next start. The version you have now is kept, so you can go back.",
+                else:
+                  "Pick any version above, download it, and start it in place of this one. Your data folder is untouched."}
             </p>
           </div>
         </div>
+
+        <MoorlandWeb.UpdateComponents.install_status install={@install} />
 
         <form id="search-form" phx-change="search" phx-submit="search" class="mt-6">
           <input

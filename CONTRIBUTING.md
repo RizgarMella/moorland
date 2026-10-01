@@ -72,7 +72,10 @@ lib/moorland/
                            scenes, numbers cast, totals shoot days, day out
                            of days and call sheets
   storage.ex               Data folder, relocation, .fountain mirroring
-  updates.ex               GitHub release checker behind the update banner
+  updates.ex               GitHub release checker behind the update banner,
+                           and installing a release (download, verify, swap)
+  updates/installer.ex     The self-install steps as plain functions: assets,
+                           signatures, the rename swap, rollback, restart
   peers.ex                 Installation identity, peer codes, trust
   peers/crypto.ex          Ed25519 keys, signing, peer code format
   peers/envelope.ex        The encrypted wire, as pure functions: sealed
@@ -180,6 +183,17 @@ release together with the Erlang runtime into a single executable.
   run `moorland_<target> maintenance uninstall` first.
 - Pushing a tag such as `v0.2.0` runs the release workflow: all four builds
   are attached to a GitHub release, which the in-app update banner reads.
+- Builds install updates themselves only when they are signed. Make a key
+  pair once with `mix moorland.release_key`: the public half goes in
+  `config :moorland, :release_public_key` (`config/config.exs`), the private
+  half becomes the repository secret `MOORLAND_RELEASE_KEY`. With the secret
+  set, the workflow runs `mix moorland.sign` on each build and attaches the
+  `.sig` beside it; without it, releases are unsigned and the app offers a
+  download link instead. Keep the private key out of the repository: anyone
+  holding it can push code to every installation.
+- To try an install without a release, run the server with
+  `__BURRITO_BIN_PATH` pointing at a scratch file and `MOORLAND_UPDATE_KEY`
+  set; `test/moorland/updates_self_install_test.exs` shows the setup.
 
 Production configuration lives in `config/runtime.exs`: the data folder
 (`MOORLAND_DATA_DIR`, else the pointer file, else the platform's application

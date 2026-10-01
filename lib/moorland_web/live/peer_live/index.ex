@@ -6,8 +6,19 @@ defmodule MoorlandWeb.PeerLive.Index do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, refresh(socket)}
+    if connected?(socket), do: Moorland.Updates.subscribe()
+    {:ok, socket |> refresh() |> MoorlandWeb.UpdateComponents.assign_updates()}
   end
+
+  @impl true
+  def handle_info({:update_install, install}, socket) do
+    {:noreply,
+     socket
+     |> assign(:install, install)
+     |> assign(:previous_build, Moorland.Updates.previous?())}
+  end
+
+  def handle_info(_msg, socket), do: {:noreply, socket}
 
   defp refresh(socket) do
     identity = Peers.identity()
@@ -91,6 +102,10 @@ defmodule MoorlandWeb.PeerLive.Index do
       _ -> {:noreply, put_flash(socket, :error, "Couldn't add that installation.")}
     end
   end
+
+  def handle_event(event, params, socket)
+      when event in ["install_update", "restart_app", "rollback_update"],
+      do: MoorlandWeb.UpdateComponents.handle_update_event(event, params, socket)
 
   def handle_event("check_updates", _params, socket) do
     message =
@@ -237,6 +252,35 @@ defmodule MoorlandWeb.PeerLive.Index do
               <.icon name="hero-arrow-up-circle" class="size-4" /> Check for updates
             </button>
           </form>
+          <p id="self-install-note" class="mt-2 text-[11px] text-base-content/50">
+            {case @self_install do
+              :ok ->
+                "This copy installs updates itself, checking each download's signature."
+
+              {:error, :not_packaged} ->
+                "Updates are installed by pulling a release (this is a development or server build)."
+
+              {:error, :no_key} ->
+                "This build has no release key, so updates are downloaded by hand."
+
+              {:error, :read_only} ->
+                "Moorland can't write to the folder it lives in, so updates are downloaded by hand."
+
+              {:error, _} ->
+                "Updates are downloaded by hand on this computer."
+            end}
+            <button
+              :if={@previous_build}
+              id="rollback-update"
+              type="button"
+              phx-click="rollback_update"
+              data-confirm="Put the previous version back? It runs from the next start."
+              class="ml-1 underline"
+            >
+              Go back to the previous version
+            </button>
+          </p>
+          <MoorlandWeb.UpdateComponents.install_status install={@install} />
         </div>
 
         <div class="mt-6 rounded-lg border border-base-300 p-5">

@@ -267,10 +267,21 @@ any setup is on the roadmap.
 
 Packaged builds check this project's releases every six hours. A quiet
 banner on the Scripts page announces a newer version with a version picker,
-and the Peers page has a manual check. Updating today means downloading the
-new file and starting it in place of the old one; your data folder is
-untouched. In place updates are on the roadmap. Forks can point the check at
-their own repository with the `MOORLAND_UPDATE_REPO` environment variable.
+and the Peers page has a manual check. Click **Install** and Moorland
+downloads the build for your computer, checks its signature against the
+release key built into it, and puts it in place of the running file; the new
+version runs from the next start, or straight away with **Restart now**. The
+version you had is kept beside it, and the Peers page can put it back. Any
+version in the picker can be installed, including older ones. Your data
+folder is never touched.
+
+Moorland only installs a download signed with the project's release key.
+When it can't install for itself (a build without the key, or one living in
+a folder it can't write to, such as a system-wide install), the banner links
+to the download instead: start the new file in place of the old one. Forks
+can point the check at their own repository with the `MOORLAND_UPDATE_REPO`
+environment variable, and at their own release key with
+`MOORLAND_UPDATE_KEY`.
 
 ## Roadmap
 

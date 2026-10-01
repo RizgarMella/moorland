@@ -39,6 +39,29 @@ defmodule Moorland.UpdatesTest do
       assert Enum.at(releases, 0).prerelease
       assert Enum.at(releases, 1).date == "2026-05-01"
     end
+
+    test "keeps each release's downloadable files" do
+      [release] =
+        Updates.parse_releases([
+          %{
+            "tag_name" => "v1.0.0",
+            "assets" => [
+              %{
+                "name" => "moorland_linux",
+                "browser_download_url" => "https://dl/moorland_linux",
+                "size" => 42
+              },
+              %{"name" => "broken"}
+            ]
+          }
+        ])
+
+      assert release.assets == [
+               %{name: "moorland_linux", url: "https://dl/moorland_linux", size: 42}
+             ]
+
+      assert [%{assets: []}] = Updates.parse_releases([%{"tag_name" => "v1.0.0"}])
+    end
   end
 
   describe "pick_banner/2" do
