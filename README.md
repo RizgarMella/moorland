@@ -199,6 +199,10 @@ Moorland installations link to each other directly.
 - Every installation has an identity and a short **peer code**. Swap codes
   with a collaborator, or find each other automatically on the same network,
   and you are linked.
+- **A name on your network.** The downloadable app answers to
+  `moorland-<id>.local` (shown on the Peers page), so anyone on the same
+  network can open it from a laptop, tablet or phone without knowing its
+  address.
 - **Share a script** from its Share panel to a peer as Editor or Viewer. It
   appears on their Scripts page and stays in sync from then on. Edits from
   both sides merge, the same way they do between collaborators on one

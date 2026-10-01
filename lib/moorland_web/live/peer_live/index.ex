@@ -31,7 +31,8 @@ defmodule MoorlandWeb.PeerLive.Index do
       peers: Peers.list_peers(socket.assigns.current_scope),
       nearby: nearby_not_added(socket),
       data_dir: Moorland.Storage.data_dir(),
-      mirror_dir: Moorland.Storage.mirror_dir()
+      mirror_dir: Moorland.Storage.mirror_dir(),
+      local_url: Moorland.Peers.Mdns.url()
     )
   end
 
@@ -213,6 +214,12 @@ defmodule MoorlandWeb.PeerLive.Index do
             Give this code to people you write with. Collaboration needs both sides to add each
             other, and works wherever this address is reachable — a LAN, a VPN like Tailscale, a
             forwarded port, or the open internet: everything between installs is end-to-end encrypted.
+          </p>
+
+          <p :if={@local_url} id="local-name" class="mt-2 text-[11px] text-base-content/60">
+            <.icon name="hero-wifi" class="mr-0.5 size-3.5 align-text-bottom" />
+            On this network, open Moorland on any computer or phone at
+            <a href={@local_url} class="font-mono underline">{@local_url}</a>
           </p>
 
           <form

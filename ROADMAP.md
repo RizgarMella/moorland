@@ -24,7 +24,7 @@ where each stands now:
 | 6 | The origin machine is the authority and must be online for its scripts to sync — no third copy holds them | Phase 2 (studio backup) | Open |
 | 7 | If a save's base version falls out of the origin's cache (~200 versions), that save degrades to last-write-wins | Phase 2 (persist merge bases) | Closed Aug 31 2026 |
 | 8 | Mirrors attach to whichever local user added the peer; peer trust is per-installation, not per-user | Phase 2 | Closed Sep 1 2026 |
-| 9 | Runs as a dev server started by hand; nothing claims a `.local` name or updates itself | Phase 4 | Partly: one-file builds shipped Sep 6 2026, signed self-installing updates Oct 1 2026; `.local` name still open |
+| 9 | Runs as a dev server started by hand; nothing claims a `.local` name or updates itself | Phase 4 | Closed Oct 1 2026: one-file builds (Sep 6), signed self-installing updates and the `.local` name (Oct 1) |
 
 ## The road to the last phase
 
@@ -286,9 +286,17 @@ it wrote; the origin's owner can delete anything and the next pull follows.
   signature against the release key built into the app, and swaps it in by
   renames, keeping the old file for rollback from the Peers page; Restart
   now relaunches through a detached delayed start. Any version in the picker
-  installs, older ones too. Left: the `.local` name claim (mDNS), and code
-  signing for Windows and macOS (an installed update is a new unsigned file,
-  so Gatekeeper and SmartScreen may ask again).
+  installs, older ones too. *The `.local` name (Oct 1 2026):* a
+  dependency-free mDNS responder (`Peers.Mdns`, `Peers.MdnsPacket`) shares
+  224.0.0.251:5353 with the system's own responder, answers A questions for
+  `moorland-<first six of the fingerprint>.local` with this machine's
+  address on the asker's network (plain resolvers get an ordinary unicast
+  reply), announces on start and says goodbye on stop. It runs only when
+  the server listens beyond loopback, and the Peers page shows the address.
+  Left: code signing for Windows and macOS (an installed update is a new
+  unsigned file, so Gatekeeper and SmartScreen may ask again), and probing
+  for a name already in use (RFC 6762 §8; the fingerprint makes a clash
+  unlikely).
 - **NAT holepunching** [peer, phase 3 core; fixes #1–2] — STUN/ICE-style
   holepunching (libp2p-inspired; `ex_webrtc` a candidate) with studios as
   rendezvous and relay fallback, so any two writers on the internet can link

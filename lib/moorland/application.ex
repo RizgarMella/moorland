@@ -27,7 +27,7 @@ defmodule Moorland.Application do
 
     children =
       if Application.get_env(:moorland, :start_peer_sync, true),
-        do: children ++ [Moorland.Peers.Sync, Moorland.Peers.Discovery],
+        do: children ++ [Moorland.Peers.Sync, Moorland.Peers.Discovery, Moorland.Peers.Mdns],
         else: children
 
     # Backfill the plain-text .fountain mirrors once per boot.

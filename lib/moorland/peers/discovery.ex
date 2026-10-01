@@ -2,8 +2,8 @@ defmodule Moorland.Peers.Discovery do
   @moduledoc """
   Zero-config LAN discovery: every install broadcasts a small signed-identity
   beacon over UDP and listens for others, so nearby Moorland installations
-  appear on the Peers page with no code pasting. (The mDNS `.local` hostname
-  arrives with single-exe packaging; this beacon needs no dependencies.)
+  appear on the Peers page with no code pasting. This beacon finds other
+  installations; `Peers.Mdns` gives this one a `.local` name for browsers.
   """
 
   use GenServer

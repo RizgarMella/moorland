@@ -86,6 +86,8 @@ lib/moorland/
   peers/client.ex          Outbound calls over :httpc (no extra dependencies)
   peers/sync.ex            Background reconciler; plan/2 is the pure logic
   peers/discovery.ex       LAN discovery beacon
+  peers/mdns.ex            The moorland-<id>.local name: a small mDNS responder
+  peers/mdns_packet.ex     DNS questions and A-record answers on the wire
 
 lib/moorland_web/
   live/script_live/index.ex    Dashboard: scripts, search, import, updates
