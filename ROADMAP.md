@@ -283,8 +283,13 @@ ships, and what is still open.
   report shipped (Oct 1 2026):* `Scripts.ProseReport` adds to Reports each
   chapter's words and reading time, echoes (a word three times in a
   paragraph), -ly adverbs, possible passive voice and plain-versus-showy
-  dialogue tags, each linking to its line. Left: DOCX/EPUB export, front
-  matter. Research (Sep 2026) into what prose needs that
+  dialogue tags, each linking to its line. *DOCX and EPUB shipped (Oct 1
+  2026):* `Scripts.ProseExport`, hand-built OOXML and EPUB 3 zipped with
+  Erlang's `:zip` (no dependency): the .docx is a standard manuscript
+  (title page with contact and rounded word count, 12pt Times, double
+  spaced, half-inch indents, chapters on new pages, `#` scene breaks), the
+  .epub one XHTML file per chapter with a table of contents; both checked
+  against python-docx and ebooklib. Left: front matter beyond the title. Research (Sep 2026) into what prose needs that
   the screenplay editor lacks, with the cost of each:
 
   | Feature | Cost |

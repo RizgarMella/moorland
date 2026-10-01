@@ -141,4 +141,38 @@ defmodule MoorlandWeb.ProseLiveTest do
     lv |> element("button[phx-value-panel=reports]") |> render_click()
     refute has_element?(lv, "#prose-report")
   end
+
+  describe "Word and EPUB downloads" do
+    test "a story downloads as both", %{conn: conn, scope: scope} do
+      {:ok, story} =
+        Scripts.create_script(scope, %{title: "Tide", content: "# One\n\nIt rose.", kind: "prose"})
+
+      docx = get(conn, ~p"/scripts/#{story.id}/export/docx")
+      assert response_content_type(docx, :docx) =~ "wordprocessingml"
+      assert get_resp_header(docx, "content-disposition") |> hd() =~ "Tide.docx"
+      assert {:ok, _} = :zip.unzip(response(docx, 200), [:memory])
+
+      epub = get(conn, ~p"/scripts/#{story.id}/export/epub")
+      assert response_content_type(epub, :epub) =~ "application/epub+zip"
+      assert binary_part(response(epub, 200), 30, 8) == "mimetype"
+
+      assert conn |> get(~p"/scripts/#{story.id}/export/exe") |> response(404)
+    end
+
+    test "the editor offers them for prose only", %{conn: conn, scope: scope} do
+      {:ok, story} = Scripts.create_script(scope, %{title: "Tide", kind: "prose"})
+      {:ok, lv, _html} = live(conn, ~p"/scripts/#{story.id}")
+      assert has_element?(lv, "#export-docx") and has_element?(lv, "#export-epub")
+
+      {:ok, play} = Scripts.create_script(scope, %{title: "Play"})
+      {:ok, lv, _html} = live(conn, ~p"/scripts/#{play.id}")
+      refute has_element?(lv, "#export-docx")
+    end
+
+    test "strangers cannot download", %{scope: scope} do
+      {:ok, story} = Scripts.create_script(scope, %{title: "Tide", kind: "prose"})
+      stranger = build_conn() |> log_in_user(user_fixture())
+      assert_error_sent 404, fn -> get(stranger, ~p"/scripts/#{story.id}/export/docx") end
+    end
+  end
 end

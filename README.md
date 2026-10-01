@@ -190,6 +190,8 @@ Moorland installations link to each other directly.
 ### Import and export
 
 - **Import** Fountain, plain text and Final Draft (`.fdx`) files.
+- **Stories and books** export as a Word manuscript in standard submission
+  format (`.docx`) or an e-book (`.epub`).
 - **Export** to PDF (clean, or watermarked DRAFT or FINAL), sides for chosen
   scenes, Fountain, Final Draft, HTML and Markdown.
 

@@ -1054,6 +1054,14 @@ defmodule MoorlandWeb.ScriptLive.Editor do
                 <button phx-click="export" phx-value-format="html">Web page (.html)</button>
               </li>
               <li><button phx-click="export" phx-value-format="markdown">Markdown (.md)</button></li>
+              <li :if={prose?(@script)}>
+                <a id="export-docx" href={~p"/scripts/#{@script.id}/export/docx"}>
+                  Word manuscript (.docx)
+                </a>
+              </li>
+              <li :if={prose?(@script)}>
+                <a id="export-epub" href={~p"/scripts/#{@script.id}/export/epub"}>E-book (.epub)</a>
+              </li>
               <li :if={screenplay?(@script)}>
                 <button phx-click="export" phx-value-format="sides">Script sides (PDF)…</button>
               </li>

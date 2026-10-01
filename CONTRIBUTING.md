@@ -65,6 +65,7 @@ lib/moorland/
   scripts/pipeline.ex      Story-to-script stages, and adapting a story to a script
   scripts/names.ex         Names in prose (mirrors assets/js/prose_names.js)
   scripts/prose_report.ex  Chapter lengths and style pointers for prose
+  scripts/prose_export.ex  Word manuscript and EPUB, zipped with :zip
   scripts/schedule.ex      Stripboard as pure functions: matches strips to
                            scenes, numbers cast, totals shoot days, day out
                            of days and call sheets
