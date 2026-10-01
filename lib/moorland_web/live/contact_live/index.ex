@@ -45,18 +45,13 @@ defmodule MoorlandWeb.ContactLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope}>
+    <Layouts.app flash={@flash} current_scope={@current_scope} section={:contacts}>
       <div class="mx-auto max-w-2xl py-10">
-        <div class="flex items-center gap-3">
-          <.link navigate={~p"/scripts"} class="rounded p-1.5 text-base-content/60 hover:bg-base-200">
-            <.icon name="hero-chevron-left" class="size-4" />
-          </.link>
-          <div>
-            <h1 class="text-2xl font-semibold tracking-tight">Contacts</h1>
-            <p class="mt-1 text-sm text-base-content/60">
-              Cast, crew and collaborators — the rolodex behind future call sheets.
-            </p>
-          </div>
+        <div>
+          <h1 class="text-2xl font-semibold tracking-tight">Contacts</h1>
+          <p class="mt-1 text-sm text-base-content/60">
+            Cast, crew and collaborators — the rolodex behind future call sheets.
+          </p>
         </div>
 
         <form

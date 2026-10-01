@@ -176,52 +176,47 @@ defmodule MoorlandWeb.ScriptLive.CallSheet do
       )
 
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope} wide>
+    <Layouts.app flash={@flash} current_scope={@current_scope} section={:scripts} wide>
       <div class="py-2 print:py-0">
-        <div class="flex flex-wrap items-center gap-3 print:hidden">
-          <.link
-            navigate={~p"/scripts/#{@script.id}/schedule"}
-            class="rounded p-1.5 text-base-content/60 transition hover:bg-base-200"
-            title="Back to the stripboard"
-          >
-            <.icon name="hero-chevron-left" class="size-4" />
-          </.link>
-          <div class="min-w-0 flex-1">
-            <h1 class="text-2xl font-semibold tracking-tight">Call sheet</h1>
-            <p class="mt-0.5 truncate text-sm text-base-content/60">{@script.title}</p>
-          </div>
-          <div :if={@sheet} class="flex items-center gap-1">
-            <.link
-              :if={@sheet.prev}
-              id="prev-day"
-              patch={~p"/scripts/#{@script.id}/schedule/day/#{@sheet.prev.day}"}
+        <MoorlandWeb.ProductionComponents.production_header
+          script={@script}
+          current={:schedule}
+          title="Call sheet"
+        >
+          <:actions>
+            <div :if={@sheet} class="flex items-center gap-1">
+              <.link
+                :if={@sheet.prev}
+                id="prev-day"
+                patch={~p"/scripts/#{@script.id}/schedule/day/#{@sheet.prev.day}"}
+                class="btn btn-ghost btn-sm"
+                title="Previous shoot day"
+              >
+                <.icon name="hero-arrow-left" class="size-4" />
+              </.link>
+              <span class="text-sm tabular-nums text-base-content/60">
+                {@sheet.index} / {@sheet.total}
+              </span>
+              <.link
+                :if={@sheet.next}
+                id="next-day"
+                patch={~p"/scripts/#{@script.id}/schedule/day/#{@sheet.next.day}"}
+                class="btn btn-ghost btn-sm"
+                title="Next shoot day"
+              >
+                <.icon name="hero-arrow-right" class="size-4" />
+              </.link>
+            </div>
+            <button
+              type="button"
+              onclick="window.print()"
               class="btn btn-ghost btn-sm"
-              title="Previous shoot day"
+              title="Print the call sheet"
             >
-              <.icon name="hero-arrow-left" class="size-4" />
-            </.link>
-            <span class="text-sm tabular-nums text-base-content/60">
-              {@sheet.index} / {@sheet.total}
-            </span>
-            <.link
-              :if={@sheet.next}
-              id="next-day"
-              patch={~p"/scripts/#{@script.id}/schedule/day/#{@sheet.next.day}"}
-              class="btn btn-ghost btn-sm"
-              title="Next shoot day"
-            >
-              <.icon name="hero-arrow-right" class="size-4" />
-            </.link>
-          </div>
-          <button
-            type="button"
-            onclick="window.print()"
-            class="btn btn-ghost btn-sm"
-            title="Print the call sheet"
-          >
-            <.icon name="hero-printer" class="size-4" /><span class="hidden sm:inline">Print</span>
-          </button>
-        </div>
+              <.icon name="hero-printer" class="size-4" /><span class="hidden sm:inline">Print</span>
+            </button>
+          </:actions>
+        </MoorlandWeb.ProductionComponents.production_header>
 
         <div
           :if={!@sheet}

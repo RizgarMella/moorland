@@ -9,8 +9,8 @@ defmodule MoorlandWeb.UserLive.LoginTest do
       {:ok, _lv, html} = live(conn, ~p"/users/log-in")
 
       assert html =~ "Log in"
-      assert html =~ "Sign up"
-      assert html =~ "Log in with email"
+      assert html =~ "Create an account"
+      assert html =~ "Email me a login link"
     end
   end
 
@@ -81,7 +81,7 @@ defmodule MoorlandWeb.UserLive.LoginTest do
 
       {:ok, _login_live, login_html} =
         lv
-        |> element("main a", "Sign up")
+        |> element("main a", "Create an account")
         |> render_click()
         |> follow_redirect(conn, ~p"/users/register")
 
@@ -98,9 +98,9 @@ defmodule MoorlandWeb.UserLive.LoginTest do
     test "shows login page with email filled in", %{conn: conn, user: user} do
       {:ok, _lv, html} = live(conn, ~p"/users/log-in")
 
-      assert html =~ "You need to reauthenticate"
+      assert html =~ "Log in again to change sensitive account settings"
       refute html =~ "Register"
-      assert html =~ "Log in with email"
+      assert html =~ "Email me a login link"
 
       assert html =~
                ~s(<input type="email" name="user[email]" id="login_form_magic_email" value="#{user.email}")

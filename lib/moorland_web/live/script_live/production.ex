@@ -175,36 +175,14 @@ defmodule MoorlandWeb.ScriptLive.Production do
     assigns = assign(assigns, today: Date.utc_today())
 
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope} wide>
+    <Layouts.app flash={@flash} current_scope={@current_scope} section={:scripts} wide>
       <div class="py-2">
-        <div class="flex flex-wrap items-center gap-3">
-          <.link
-            navigate={~p"/scripts/#{@script.id}"}
-            class="rounded p-1.5 text-base-content/60 transition hover:bg-base-200"
-            title="Back to the script"
-          >
-            <.icon name="hero-chevron-left" class="size-4" />
-          </.link>
-          <div class="min-w-0 flex-1">
-            <h1 class="text-2xl font-semibold tracking-tight">Production</h1>
-            <p class="mt-0.5 truncate text-sm text-base-content/60">{@script.title}</p>
-          </div>
-          <.link
-            navigate={~p"/scripts/#{@script.id}/schedule"}
-            class="btn btn-ghost btn-sm"
-            title="Stripboard"
-          >
-            <.icon name="hero-calendar-days" class="size-4" /><span class="hidden sm:inline">Stripboard</span>
-          </.link>
-          <.link
-            id="open-media"
-            navigate={~p"/scripts/#{@script.id}/media"}
-            class="btn btn-ghost btn-sm"
-            title="Reference files and mood boards"
-          >
-            <.icon name="hero-photo" class="size-4" /><span class="hidden sm:inline">Media</span>
-          </.link>
-        </div>
+        <MoorlandWeb.ProductionComponents.production_header
+          script={@script}
+          current={:production}
+          title="Production"
+        >
+        </MoorlandWeb.ProductionComponents.production_header>
 
         <div class="mt-6 inline-flex items-center gap-0.5 rounded-lg bg-base-200 p-0.5">
           <.link

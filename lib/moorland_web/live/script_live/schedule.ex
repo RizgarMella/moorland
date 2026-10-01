@@ -182,44 +182,24 @@ defmodule MoorlandWeb.ScriptLive.Schedule do
     assigns = assign(assigns, :can_edit, Scripts.can_edit?(assigns.role))
 
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope} wide>
+    <Layouts.app flash={@flash} current_scope={@current_scope} section={:scripts} wide>
       <div class="py-2 print:py-0">
-        <div class="flex flex-wrap items-center gap-3 print:hidden">
-          <.link
-            navigate={~p"/scripts/#{@script.id}"}
-            class="rounded p-1.5 text-base-content/60 transition hover:bg-base-200"
-            title="Back to the script"
-          >
-            <.icon name="hero-chevron-left" class="size-4" />
-          </.link>
-          <div class="min-w-0 flex-1">
-            <h1 class="text-2xl font-semibold tracking-tight">Stripboard</h1>
-            <p class="mt-0.5 truncate text-sm text-base-content/60">{@script.title}</p>
-          </div>
-          <.link
-            id="open-production"
-            navigate={~p"/scripts/#{@script.id}/production"}
-            class="btn btn-ghost btn-sm"
-            title="Tasks and calendar"
-          >
-            <.icon name="hero-clipboard-document-check" class="size-4" /><span class="hidden sm:inline">Production</span>
-          </.link>
-          <.link
-            navigate={~p"/scripts/#{@script.id}/breakdown"}
-            class="btn btn-ghost btn-sm"
-            title="Breakdown"
-          >
-            <.icon name="hero-tag" class="size-4" /><span class="hidden sm:inline">Breakdown</span>
-          </.link>
-          <button
-            type="button"
-            onclick="window.print()"
-            class="btn btn-ghost btn-sm"
-            title="Print the stripboard"
-          >
-            <.icon name="hero-printer" class="size-4" /><span class="hidden sm:inline">Print</span>
-          </button>
-        </div>
+        <MoorlandWeb.ProductionComponents.production_header
+          script={@script}
+          current={:schedule}
+          title="Stripboard"
+        >
+          <:actions>
+            <button
+              type="button"
+              onclick="window.print()"
+              class="btn btn-ghost btn-sm"
+              title="Print the stripboard"
+            >
+              <.icon name="hero-printer" class="size-4" /><span class="hidden sm:inline">Print</span>
+            </button>
+          </:actions>
+        </MoorlandWeb.ProductionComponents.production_header>
 
         <div class="mt-6 hidden print:block">
           <h1 class="text-xl font-semibold">{@script.title} — Stripboard</h1>

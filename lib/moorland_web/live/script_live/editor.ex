@@ -950,6 +950,29 @@ defmodule MoorlandWeb.ScriptLive.Editor do
   defp screenplay?(script), do: script.kind == "screenplay"
   defp sluglines?(script), do: Moorland.Scripts.Script.sluglines?(script)
 
+  @panels [
+    {"comments", "hero-chat-bubble-left", "Comments"},
+    {"notes", "hero-clipboard-document-list", "Notes"},
+    {"bin", "hero-archive-box", "Bin"},
+    {"lookup", "hero-book-open", "Lookup"},
+    {"history", "hero-clock", "History"},
+    {"reports", "hero-chart-bar", "Reports"},
+    {"breakdown", "hero-tag", "Breakdown"},
+    {"share", "hero-user-plus", "Share"}
+  ]
+
+  # The side panels this document offers; only scene-based kinds break down.
+  defp editor_panels(script) do
+    Enum.reject(@panels, fn {panel, _, _} -> panel == "breakdown" and not sluglines?(script) end)
+  end
+
+  defp panel_icon(panel) do
+    case List.keyfind(@panels, panel, 0) do
+      {_, icon, _} -> icon
+      nil -> "hero-squares-2x2"
+    end
+  end
+
   # 90 -> "1:30"
   defp clock(seconds) when is_integer(seconds),
     do:
@@ -1281,24 +1304,60 @@ defmodule MoorlandWeb.ScriptLive.Editor do
             </span>
           </div>
 
-          <div class="flex min-w-16 items-center gap-0.5 overflow-x-auto rounded-lg bg-base-200 p-0.5 lg:shrink-0">
+          <details
+            id="panel-menu"
+            class="dropdown dropdown-end sm:hidden"
+            phx-click-away={JS.remove_attribute("open", to: "#panel-menu")}
+          >
+            <summary
+              class={[
+                "relative flex cursor-pointer list-none items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition [&::-webkit-details-marker]:hidden",
+                if(@panel, do: "bg-base-200 text-base-content", else: "text-base-content/60")
+              ]}
+              title="Panels"
+            >
+              <.icon name={panel_icon(@panel)} class="size-4" />
+              <.icon name="hero-chevron-down-mini" class="size-3 opacity-60" />
+              <span
+                :if={visible_comments(@comments, false) != [] or @suggestions != []}
+                class="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-neutral"
+              />
+            </summary>
+            <ul class="dropdown-content menu z-50 mt-1 w-48 rounded-lg border border-base-300 bg-base-100 p-1 text-sm shadow-lg">
+              <li :for={{panel, icon, label} <- editor_panels(@script)}>
+                <button
+                  type="button"
+                  phx-click={
+                    JS.push("toggle_panel", value: %{panel: panel})
+                    |> JS.remove_attribute("open", to: "#panel-menu")
+                  }
+                  class={@panel == panel && "menu-active"}
+                >
+                  <.icon name={icon} class="size-4" />
+                  {label}
+                  <span
+                    :if={panel == "comments" && visible_comments(@comments, false) != []}
+                    class="ml-auto rounded-full bg-neutral px-1.5 text-[10px] text-neutral-content"
+                  >
+                    {length(visible_comments(@comments, false))}
+                  </span>
+                  <span
+                    :if={panel == "history" && @suggestions != []}
+                    class="ml-auto rounded-full bg-primary px-1.5 text-[10px] text-primary-content"
+                  >
+                    {length(@suggestions)}
+                  </span>
+                </button>
+              </li>
+            </ul>
+          </details>
+
+          <div
+            id="panel-tabs"
+            class="hidden min-w-16 items-center gap-0.5 overflow-x-auto rounded-lg bg-base-200 p-0.5 sm:flex lg:shrink-0"
+          >
             <button
-              :for={
-                {panel, icon, label} <-
-                  [
-                    {"comments", "hero-chat-bubble-left", "Comments"},
-                    {"notes", "hero-clipboard-document-list", "Notes"},
-                    {"bin", "hero-archive-box", "Bin"},
-                    {"lookup", "hero-book-open", "Lookup"},
-                    {"history", "hero-clock", "History"},
-                    {"reports", "hero-chart-bar", "Reports"},
-                    {"breakdown", "hero-tag", "Breakdown"},
-                    {"share", "hero-user-plus", "Share"}
-                  ]
-                  |> Enum.reject(fn {panel, _, _} ->
-                    panel == "breakdown" and not sluglines?(@script)
-                  end)
-              }
+              :for={{panel, icon, label} <- editor_panels(@script)}
               phx-click="toggle_panel"
               phx-value-panel={panel}
               class={[

@@ -25,6 +25,51 @@ defmodule MoorlandWeb.ScriptLiveTest do
     assert_redirect(lv)
   end
 
+  test "header nav marks the section a page belongs to", %{conn: conn, scope: scope} do
+    {:ok, script} = Scripts.create_script(scope, %{title: "Cold Open"})
+
+    for {path, current} <- [
+          {~p"/scripts", "/scripts"},
+          {~p"/scripts/#{script.id}/breakdown", "/scripts"},
+          {~p"/contacts", "/contacts"},
+          {~p"/peers", "/peers"}
+        ] do
+      {:ok, lv, _html} = live(conn, path)
+      assert has_element?(lv, ~s(#primary-nav a[href="#{current}"][aria-current="page"]))
+      assert lv |> element("#primary-nav a[aria-current]") |> render() =~ current
+    end
+  end
+
+  test "production pages share tabs that mark the current document", %{
+    conn: conn,
+    scope: scope
+  } do
+    {:ok, script} = Scripts.create_script(scope, %{title: "Cold Open"})
+
+    for {path, tab} <- [
+          {~p"/scripts/#{script.id}/breakdown", "#open-breakdown"},
+          {~p"/scripts/#{script.id}/shots", "#open-shots"},
+          {~p"/scripts/#{script.id}/schedule", "#open-schedule"},
+          {~p"/scripts/#{script.id}/schedule/day/1", "#open-schedule"},
+          {~p"/scripts/#{script.id}/production", "#open-production"},
+          {~p"/scripts/#{script.id}/media", "#open-media"}
+        ] do
+      {:ok, lv, _html} = live(conn, path)
+      assert has_element?(lv, ~s(#back-to-script[href="/scripts/#{script.id}"]))
+      assert has_element?(lv, "#production-tabs #{tab}[aria-current=page]")
+      assert lv |> element("#production-tabs a[aria-current]") |> has_element?()
+    end
+  end
+
+  test "phones get every editor panel from one menu", %{conn: conn, scope: scope} do
+    {:ok, script} = Scripts.create_script(scope, %{title: "Cold Open"})
+    {:ok, lv, _html} = live(conn, ~p"/scripts/#{script.id}")
+
+    assert has_element?(lv, "#panel-menu summary")
+    assert lv |> element("#panel-menu li:nth-child(5) button") |> render_click() =~ "History"
+    assert has_element?(lv, "#panel-menu li:nth-child(5) button.menu-active")
+  end
+
   test "editor renders and saves content", %{conn: conn, scope: scope} do
     {:ok, script} = Scripts.create_script(scope, %{title: "Cold Open"})
 

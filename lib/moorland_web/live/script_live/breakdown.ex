@@ -162,70 +162,33 @@ defmodule MoorlandWeb.ScriptLive.Breakdown do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope} wide>
+    <Layouts.app flash={@flash} current_scope={@current_scope} section={:scripts} wide>
       <div class="py-2 print:py-0">
-        <div class="flex flex-wrap items-center gap-3 print:hidden">
-          <.link
-            navigate={~p"/scripts/#{@script.id}"}
-            class="rounded p-1.5 text-base-content/60 transition hover:bg-base-200"
-            title="Back to the script"
-          >
-            <.icon name="hero-chevron-left" class="size-4" />
-          </.link>
-          <div class="min-w-0 flex-1">
-            <h1 class="text-2xl font-semibold tracking-tight">Breakdown</h1>
-            <p class="mt-0.5 truncate text-sm text-base-content/60">{@script.title}</p>
-          </div>
-          <.link
-            id="open-shots"
-            navigate={~p"/scripts/#{@script.id}/shots"}
-            class="btn btn-ghost btn-sm"
-            title="Shot list"
-          >
-            <.icon name="hero-video-camera" class="size-4" /><span class="hidden sm:inline">Shots</span>
-          </.link>
-          <.link
-            id="open-media"
-            navigate={~p"/scripts/#{@script.id}/media"}
-            class="btn btn-ghost btn-sm"
-            title="Reference files and mood boards"
-          >
-            <.icon name="hero-photo" class="size-4" /><span class="hidden sm:inline">Media</span>
-          </.link>
-          <.link
-            id="open-production"
-            navigate={~p"/scripts/#{@script.id}/production"}
-            class="btn btn-ghost btn-sm"
-            title="Tasks and calendar"
-          >
-            <.icon name="hero-clipboard-document-check" class="size-4" /><span class="hidden sm:inline">Production</span>
-          </.link>
-          <.link
-            id="open-schedule"
-            navigate={~p"/scripts/#{@script.id}/schedule"}
-            class="btn btn-ghost btn-sm"
-            title="Stripboard"
-          >
-            <.icon name="hero-calendar-days" class="size-4" /><span class="hidden sm:inline">Stripboard</span>
-          </.link>
-          <a
-            id="breakdown-csv"
-            href={~p"/scripts/#{@script.id}/breakdown.csv"}
-            class="btn btn-ghost btn-sm"
-            title="Download as a spreadsheet (CSV)"
-          >
-            <.icon name="hero-table-cells" class="size-4" /><span class="hidden sm:inline">CSV</span>
-          </a>
-          <button
-            id="breakdown-print"
-            type="button"
-            onclick="window.print()"
-            class="btn btn-ghost btn-sm"
-            title="Print or save as PDF"
-          >
-            <.icon name="hero-printer" class="size-4" /><span class="hidden sm:inline">Print</span>
-          </button>
-        </div>
+        <MoorlandWeb.ProductionComponents.production_header
+          script={@script}
+          current={:breakdown}
+          title="Breakdown"
+        >
+          <:actions>
+            <a
+              id="breakdown-csv"
+              href={~p"/scripts/#{@script.id}/breakdown.csv"}
+              class="btn btn-ghost btn-sm"
+              title="Download as a spreadsheet (CSV)"
+            >
+              <.icon name="hero-table-cells" class="size-4" /><span class="hidden sm:inline">CSV</span>
+            </a>
+            <button
+              id="breakdown-print"
+              type="button"
+              onclick="window.print()"
+              class="btn btn-ghost btn-sm"
+              title="Print or save as PDF"
+            >
+              <.icon name="hero-printer" class="size-4" /><span class="hidden sm:inline">Print</span>
+            </button>
+          </:actions>
+        </MoorlandWeb.ProductionComponents.production_header>
 
         <div class="mt-6 hidden print:block">
           <h1 class="text-xl font-semibold">{@script.title} — Breakdown</h1>

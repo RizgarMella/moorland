@@ -8,18 +8,16 @@ defmodule MoorlandWeb.UserLive.Registration do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <div class="mx-auto max-w-sm">
-        <div class="text-center">
-          <.header>
-            Register for an account
-            <:subtitle>
-              Already registered?
-              <.link navigate={~p"/users/log-in"} class="font-semibold text-brand hover:underline">
-                Log in
-              </.link>
-              to your account now.
-            </:subtitle>
-          </.header>
+      <div class="mx-auto max-w-sm space-y-6 py-6 sm:py-10">
+        <div>
+          <h1 class="text-2xl font-semibold tracking-tight">Create an account</h1>
+          <p class="mt-1 text-sm text-base-content/60">
+            Already have one? <.link
+              navigate={~p"/users/log-in"}
+              class="font-medium text-base-content underline decoration-base-content/30 underline-offset-2 transition-colors hover:decoration-base-content"
+              phx-no-format
+            >Log in</.link>.
+          </p>
         </div>
 
         <.form for={@form} id="registration_form" phx-submit="save" phx-change="validate">
@@ -33,7 +31,7 @@ defmodule MoorlandWeb.UserLive.Registration do
             phx-mounted={JS.focus()}
           />
 
-          <.button phx-disable-with="Creating account..." class="btn btn-primary w-full">
+          <.button phx-disable-with="Creating account..." class="btn btn-neutral w-full">
             Create an account
           </.button>
         </.form>

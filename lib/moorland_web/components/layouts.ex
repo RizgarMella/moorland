@@ -35,24 +35,61 @@ defmodule MoorlandWeb.Layouts do
     default: false,
     doc: "widen the content column for boards and sheets"
 
+  attr :section, :atom,
+    default: nil,
+    values: [nil, :scripts, :contacts, :peers, :settings],
+    doc: "which header destination this page belongs to"
+
   slot :inner_block, required: true
 
   def app(assigns) do
     ~H"""
-    <header class="flex h-12 items-center gap-4 border-b border-base-300 px-4 sm:px-6 lg:px-8 print:hidden">
-      <.link navigate={~p"/"} class="text-sm font-semibold tracking-tight">
+    <header class="sticky top-0 z-30 flex h-12 items-center gap-2 border-b border-base-300 bg-base-100/85 px-3 backdrop-blur sm:gap-4 sm:px-6 lg:px-8 print:hidden">
+      <.link
+        navigate={~p"/"}
+        class="mr-1 text-sm font-semibold tracking-tight transition-opacity hover:opacity-70 sm:mr-2"
+      >
         Moorland
       </.link>
 
-      <div class="ml-auto flex items-center gap-3 text-sm">
+      <nav :if={@current_scope} id="primary-nav" class="flex items-center gap-0.5">
+        <.nav_link
+          to={~p"/scripts"}
+          icon="hero-document-text"
+          label="Scripts"
+          active={@section == :scripts}
+        />
+        <.nav_link
+          to={~p"/contacts"}
+          icon="hero-identification"
+          label="Contacts"
+          active={@section == :contacts}
+        />
+        <.nav_link to={~p"/peers"} icon="hero-signal" label="Peers" active={@section == :peers} />
+      </nav>
+
+      <div class="ml-auto flex items-center gap-1 text-sm sm:gap-2">
         <.theme_toggle />
         <%= if @current_scope do %>
-          <span class="hidden text-xs text-base-content/50 sm:inline">
+          <span class="hidden px-2 text-xs text-base-content/50 lg:inline">
             {@current_scope.user.email}
           </span>
-          <.link href={~p"/users/settings"} class="btn btn-ghost btn-sm">Settings</.link>
-          <.link href={~p"/users/log-out"} method="delete" class="btn btn-ghost btn-sm">
-            Log out
+          <.link
+            href={~p"/users/settings"}
+            class={["btn btn-ghost btn-sm px-2 sm:px-3", @section == :settings && "btn-active"]}
+            title="Account settings"
+          >
+            <.icon name="hero-cog-6-tooth" class="size-4 sm:hidden" />
+            <span class="hidden sm:inline">Settings</span>
+          </.link>
+          <.link
+            href={~p"/users/log-out"}
+            method="delete"
+            class="btn btn-ghost btn-sm px-2 sm:px-3"
+            title="Log out"
+          >
+            <.icon name="hero-arrow-right-start-on-rectangle" class="size-4 sm:hidden" />
+            <span class="hidden sm:inline">Log out</span>
           </.link>
         <% else %>
           <.link href={~p"/users/register"} class="btn btn-ghost btn-sm">Register</.link>
@@ -68,6 +105,36 @@ defmodule MoorlandWeb.Layouts do
     </main>
 
     <.flash_group flash={@flash} />
+    """
+  end
+
+  attr :to, :string, required: true
+  attr :icon, :string, required: true
+  attr :label, :string, required: true
+  attr :active, :boolean, default: false
+
+  # A header destination: icon-only on phones, labelled from sm up.
+  defp nav_link(assigns) do
+    ~H"""
+    <.link
+      navigate={@to}
+      aria-current={@active && "page"}
+      title={@label}
+      class={[
+        "relative flex h-8 items-center gap-1.5 rounded-md px-2 text-sm transition-colors sm:px-2.5",
+        if(@active,
+          do: "font-medium text-base-content",
+          else: "text-base-content/60 hover:bg-base-200 hover:text-base-content"
+        )
+      ]}
+    >
+      <.icon name={@icon} class="size-4 sm:hidden" />
+      <span class="hidden sm:inline">{@label}</span>
+      <span
+        :if={@active}
+        class="absolute inset-x-2 -bottom-[9px] h-0.5 rounded-full bg-base-content"
+      />
+    </.link>
     """
   end
 

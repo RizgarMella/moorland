@@ -172,18 +172,13 @@ defmodule MoorlandWeb.PeerLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope}>
+    <Layouts.app flash={@flash} current_scope={@current_scope} section={:peers}>
       <div class="mx-auto max-w-2xl py-10">
-        <div class="flex items-center gap-3">
-          <.link navigate={~p"/scripts"} class="rounded p-1.5 text-base-content/60 hover:bg-base-200">
-            <.icon name="hero-chevron-left" class="size-4" />
-          </.link>
-          <div>
-            <h1 class="text-2xl font-semibold tracking-tight">Peers</h1>
-            <p class="mt-1 text-sm text-base-content/60">
-              Direct, serverless collaboration between Moorland installations.
-            </p>
-          </div>
+        <div>
+          <h1 class="text-2xl font-semibold tracking-tight">Peers</h1>
+          <p class="mt-1 text-sm text-base-content/60">
+            Direct, serverless collaboration between Moorland installations.
+          </p>
         </div>
 
         <div class="mt-8 rounded-lg border border-base-300 p-5">

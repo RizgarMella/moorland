@@ -163,7 +163,7 @@ defmodule MoorlandWeb.ScriptLive.Index do
         phx-click="delete"
         phx-value-id={@script.id}
         data-confirm={"Delete \"#{@script.title}\"? This removes its versions, comments and notes."}
-        class="absolute right-3 top-3 hidden rounded p-1 text-base-content/40 hover:bg-base-200 hover:text-error group-hover:block"
+        class="absolute right-3 top-3 rounded p-1 text-base-content/40 opacity-0 transition hover:bg-base-200 hover:text-error focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100"
         title="Delete script"
       >
         <.icon name="hero-trash" class="size-4" />
@@ -231,27 +231,13 @@ defmodule MoorlandWeb.ScriptLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope}>
+    <Layouts.app flash={@flash} current_scope={@current_scope} section={:scripts}>
       <div class="mx-auto max-w-2xl py-10">
-        <div class="flex items-end justify-between gap-4">
-          <div>
-            <h1 class="text-2xl font-semibold tracking-tight">Scripts</h1>
-            <p class="mt-1 text-sm text-base-content/60">
-              Everything you own or collaborate on.
-            </p>
-          </div>
-          <div class="flex gap-1">
-            <.link navigate={~p"/contacts"} class="btn btn-ghost btn-sm" title="Cast & crew rolodex">
-              <.icon name="hero-identification" class="size-4" /> Contacts
-            </.link>
-            <.link
-              navigate={~p"/peers"}
-              class="btn btn-ghost btn-sm"
-              title="Peer-to-peer collaboration"
-            >
-              <.icon name="hero-signal" class="size-4" /> Peers
-            </.link>
-          </div>
+        <div>
+          <h1 class="text-2xl font-semibold tracking-tight">Scripts</h1>
+          <p class="mt-1 text-sm text-base-content/60">
+            Everything you own or collaborate on.
+          </p>
         </div>
 
         <div
@@ -378,15 +364,19 @@ defmodule MoorlandWeb.ScriptLive.Index do
           </p>
         </div>
 
-        <form id="create-script-form" phx-submit="create" class="mt-6 flex gap-2">
+        <form id="create-script-form" phx-submit="create" class="mt-6 flex flex-wrap gap-2">
           <input
             type="text"
             name="title"
             placeholder="New script title…"
             autocomplete="off"
-            class="input input-bordered min-w-0 flex-1"
+            class="input input-bordered w-full min-w-0 sm:w-auto sm:flex-1"
           />
-          <select name="kind" class="select select-bordered w-36" aria-label="Kind of document">
+          <select
+            name="kind"
+            class="select select-bordered min-w-0 flex-1 sm:w-36 sm:flex-none"
+            aria-label="Kind of document"
+          >
             <option value="screenplay">Screenplay</option>
             <option value="stageplay">Stage play</option>
             <option value="multicam">Multi-camera sitcom</option>
@@ -404,17 +394,18 @@ defmodule MoorlandWeb.ScriptLive.Index do
               </option>
             </optgroup>
           </select>
-          <button type="submit" class="btn btn-neutral">
+          <button type="submit" class="btn btn-neutral" phx-disable-with="Creating…">
             <.icon name="hero-plus" class="size-4" /> New script
           </button>
           <label
             id="script-importer"
             phx-hook="ScriptImporter"
             phx-update="ignore"
-            class="btn btn-ghost"
+            class="btn btn-ghost px-3 sm:px-4"
             title="Import a .fountain, .txt, Final Draft .fdx or screenplay PDF"
           >
-            <.icon name="hero-arrow-up-tray" class="size-4" /> Import
+            <.icon name="hero-arrow-up-tray" class="size-4" />
+            <span class="hidden sm:inline">Import</span>
             <input type="file" accept=".fountain,.txt,.fdx,.pdf" class="hidden" />
           </label>
         </form>
@@ -484,7 +475,7 @@ defmodule MoorlandWeb.ScriptLive.Index do
                 phx-click="delete"
                 phx-value-id={script.id}
                 data-confirm={"Remove your synced copy of \"#{script.title}\"? The peer's original is untouched."}
-                class="absolute right-3 top-3 hidden rounded p-1 text-base-content/40 hover:bg-base-200 hover:text-error group-hover:block"
+                class="absolute right-3 top-3 rounded p-1 text-base-content/40 opacity-0 transition hover:bg-base-200 hover:text-error focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100"
                 title="Remove synced copy"
               >
                 <.icon name="hero-trash" class="size-4" />

@@ -7,32 +7,37 @@ defmodule MoorlandWeb.UserLive.Login do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <div class="mx-auto max-w-sm space-y-4">
-        <div class="text-center">
-          <.header>
-            <p>Log in</p>
-            <:subtitle>
-              <%= if @current_scope do %>
-                You need to reauthenticate to perform sensitive actions on your account.
-              <% else %>
-                Don't have an account? <.link
-                  navigate={~p"/users/register"}
-                  class="font-semibold text-brand hover:underline"
-                  phx-no-format
-                >Sign up</.link> for an account now.
-              <% end %>
-            </:subtitle>
-          </.header>
+      <div class="mx-auto max-w-sm space-y-6 py-6 sm:py-10">
+        <div>
+          <h1 class="text-2xl font-semibold tracking-tight">
+            {if @current_scope, do: "Confirm it's you", else: "Log in"}
+          </h1>
+          <p class="mt-1 text-sm text-base-content/60">
+            <%= if @current_scope do %>
+              Log in again to change sensitive account settings.
+            <% else %>
+              New here? <.link
+                navigate={~p"/users/register"}
+                class="font-medium text-base-content underline decoration-base-content/30 underline-offset-2 transition-colors hover:decoration-base-content"
+                phx-no-format
+              >Create an account</.link>.
+            <% end %>
+          </p>
         </div>
 
-        <div :if={local_mail_adapter?()} class="alert alert-info">
-          <.icon name="hero-information-circle" class="size-6 shrink-0" />
-          <div>
-            <p>You are running the local mail adapter.</p>
-            <p>
-              To see sent emails, visit <.link href="/dev/mailbox" class="underline">the mailbox page</.link>.
-            </p>
-          </div>
+        <div
+          :if={local_mail_adapter?()}
+          id="mailbox-hint"
+          class="flex gap-3 rounded-lg border border-base-300 bg-base-200/40 px-4 py-3 text-sm"
+        >
+          <.icon name="hero-inbox" class="mt-0.5 size-4 shrink-0 text-base-content/60" />
+          <p class="text-base-content/70">
+            Moorland sends no real email. Login links land in <.link
+              href="/dev/mailbox"
+              class="font-medium text-base-content underline underline-offset-2"
+              phx-no-format
+            >this computer's mailbox</.link>.
+          </p>
         </div>
 
         <.form
@@ -52,12 +57,12 @@ defmodule MoorlandWeb.UserLive.Login do
             required
             phx-mounted={JS.focus()}
           />
-          <.button class="btn btn-primary w-full">
-            Log in with email <span aria-hidden="true">→</span>
+          <.button class="btn btn-neutral w-full">
+            Email me a login link <span aria-hidden="true">→</span>
           </.button>
         </.form>
 
-        <div class="divider">or</div>
+        <div class="divider text-xs text-base-content/40">or use a password</div>
 
         <.form
           :let={f}
@@ -83,10 +88,10 @@ defmodule MoorlandWeb.UserLive.Login do
             autocomplete="current-password"
             spellcheck="false"
           />
-          <.button class="btn btn-primary w-full" name={@form[:remember_me].name} value="true">
+          <.button class="btn btn-neutral w-full" name={@form[:remember_me].name} value="true">
             Log in and stay logged in <span aria-hidden="true">→</span>
           </.button>
-          <.button class="btn btn-primary btn-soft w-full mt-2">
+          <.button class="btn btn-ghost w-full mt-2 text-base-content/70">
             Log in only this time
           </.button>
         </.form>

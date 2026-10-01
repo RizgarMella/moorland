@@ -173,46 +173,27 @@ defmodule MoorlandWeb.ScriptLive.Shots do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope} wide>
+    <Layouts.app flash={@flash} current_scope={@current_scope} section={:scripts} wide>
       <div class="py-2 print:py-0">
-        <div class="flex flex-wrap items-center gap-3 print:hidden">
-          <.link
-            navigate={~p"/scripts/#{@script.id}"}
-            class="rounded p-1.5 text-base-content/60 transition hover:bg-base-200"
-            title="Back to the script"
-          >
-            <.icon name="hero-chevron-left" class="size-4" />
-          </.link>
-          <div class="min-w-0 flex-1">
-            <h1 class="text-2xl font-semibold tracking-tight">Shot list</h1>
-            <p class="mt-0.5 truncate text-sm text-base-content/60">
-              {@script.title} · {@list.total} {if @list.total == 1, do: "shot", else: "shots"}
-            </p>
-          </div>
-          <.link
-            navigate={~p"/scripts/#{@script.id}/breakdown"}
-            class="btn btn-ghost btn-sm"
-            title="Breakdown"
-          >
-            <.icon name="hero-tag" class="size-4" /><span class="hidden sm:inline">Breakdown</span>
-          </.link>
-          <.link
-            id="open-media"
-            navigate={~p"/scripts/#{@script.id}/media"}
-            class="btn btn-ghost btn-sm"
-            title="Reference files and mood boards"
-          >
-            <.icon name="hero-photo" class="size-4" /><span class="hidden sm:inline">Media</span>
-          </.link>
-          <button
-            type="button"
-            onclick="window.print()"
-            class="btn btn-ghost btn-sm"
-            title="Print the shot list"
-          >
-            <.icon name="hero-printer" class="size-4" /><span class="hidden sm:inline">Print</span>
-          </button>
-        </div>
+        <MoorlandWeb.ProductionComponents.production_header
+          script={@script}
+          current={:shots}
+          title="Shot list"
+        >
+          <:subtitle>
+            {@list.total} {if @list.total == 1, do: "shot", else: "shots"}
+          </:subtitle>
+          <:actions>
+            <button
+              type="button"
+              onclick="window.print()"
+              class="btn btn-ghost btn-sm"
+              title="Print the shot list"
+            >
+              <.icon name="hero-printer" class="size-4" /><span class="hidden sm:inline">Print</span>
+            </button>
+          </:actions>
+        </MoorlandWeb.ProductionComponents.production_header>
 
         <h1 class="hidden text-xl font-semibold print:block">{@script.title} — Shot list</h1>
 

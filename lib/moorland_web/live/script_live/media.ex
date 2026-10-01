@@ -186,47 +186,19 @@ defmodule MoorlandWeb.ScriptLive.Media do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope} wide>
+    <Layouts.app flash={@flash} current_scope={@current_scope} section={:scripts} wide>
       <div class="py-2">
-        <div class="flex flex-wrap items-center gap-3">
-          <.link
-            navigate={~p"/scripts/#{@script.id}"}
-            class="rounded p-1.5 text-base-content/60 transition hover:bg-base-200"
-            title="Back to the script"
-          >
-            <.icon name="hero-chevron-left" class="size-4" />
-          </.link>
-          <div class="min-w-0 flex-1">
-            <h1 class="text-2xl font-semibold tracking-tight">
-              {if @board, do: @board, else: "Media"}
-            </h1>
-            <p class="mt-0.5 truncate text-sm text-base-content/60">
-              {@script.title} · {if @board, do: "mood board · ", else: ""}{length(@items)} {if length(
-                                                                                                 @items
-                                                                                               ) == 1,
-                                                                                               do:
-                                                                                                 "file",
-                                                                                               else:
-                                                                                                 "files"}
-            </p>
-          </div>
-          <.link
-            id="open-breakdown"
-            navigate={~p"/scripts/#{@script.id}/breakdown"}
-            class="btn btn-ghost btn-sm"
-            title="Breakdown"
-          >
-            <.icon name="hero-tag" class="size-4" /><span class="hidden sm:inline">Breakdown</span>
-          </.link>
-          <.link
-            id="open-shots"
-            navigate={~p"/scripts/#{@script.id}/shots"}
-            class="btn btn-ghost btn-sm"
-            title="Shot list"
-          >
-            <.icon name="hero-video-camera" class="size-4" /><span class="hidden sm:inline">Shots</span>
-          </.link>
-        </div>
+        <MoorlandWeb.ProductionComponents.production_header
+          script={@script}
+          current={:media}
+          title={if @board, do: @board, else: "Media"}
+        >
+          <:subtitle>
+            {if @board, do: "Mood board · "}{length(@items)} {if length(@items) == 1,
+              do: "file",
+              else: "files"}
+          </:subtitle>
+        </MoorlandWeb.ProductionComponents.production_header>
 
         <nav id="media-boards" class="mt-5 flex flex-wrap items-center gap-1.5 text-sm">
           <.link
