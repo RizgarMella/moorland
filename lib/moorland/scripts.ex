@@ -929,6 +929,50 @@ defmodule Moorland.Scripts do
 
   defp tap_tasks(result, _script), do: result
 
+  ## Locked pages
+
+  @doc """
+  Locks the pages: from now on each page keeps its number and anything
+  added overflows to A-pages (12A), so revised pages can go out on their
+  own. `base` is the text the pages were laid out from, as the editor had
+  it; `pages` is where each page begins in it, as the editor paginates:
+  `[%{"page" => "2", "line" => 57}, ...]`.
+  """
+  def lock_pages(%Scope{} = scope, %Script{} = script, base, pages)
+      when is_binary(base) and is_list(pages) and byte_size(base) <= 2_000_000 do
+    with :ok <- authorize(scope, script, :edit),
+         {:ok, pages} <- clean_pages(pages) do
+      set_page_lock(scope, script, %{"base" => base, "pages" => pages})
+    end
+  end
+
+  def lock_pages(_scope, _script, _base, _pages), do: {:error, :invalid_pages}
+
+  def unlock_pages(%Scope{} = scope, %Script{} = script) do
+    with :ok <- authorize(scope, script, :edit), do: set_page_lock(scope, script, nil)
+  end
+
+  defp set_page_lock(scope, script, lock) do
+    script
+    |> Ecto.Changeset.change(page_lock: lock)
+    |> Repo.update()
+    |> tap_broadcast(scope, :script_updated)
+    |> tap_nudge(script)
+  end
+
+  @doc false
+  def clean_pages(pages) when length(pages) <= 5_000 do
+    clean =
+      for %{"page" => page, "line" => line} <- pages,
+          is_binary(page) and page =~ ~r/^[0-9]{1,5}[A-Z]{0,3}$/ and is_integer(line) and
+            line >= 0,
+          do: %{"page" => page, "line" => line}
+
+    if length(clean) == length(pages), do: {:ok, clean}, else: {:error, :invalid_pages}
+  end
+
+  def clean_pages(_pages), do: {:error, :invalid_pages}
+
   ## Revision sets
 
   def list_revision_sets(%Script{} = script) do

@@ -811,6 +811,35 @@ body.mo-typewriter [data-typewriter] {
   }
 }
 
+/* ---- Locked pages in print ------------------------------------------------ */
+
+/* With pages locked the preview's own page breaks are printed, each page
+   numbered by its locked label (12, 12A) instead of the browser's count. */
+@page locked {
+  @top-right {
+    content: none;
+  }
+}
+
+@media print {
+  /* Single-spaced 12pt Courier, six lines an inch: the measure the page
+     estimate counts in, so each locked page fills one sheet. */
+  .print-screenplay.print-locked {
+    page: locked;
+    line-height: 1;
+  }
+
+  .print-screenplay.print-locked .fp-page-edge {
+    break-before: page;
+    margin: 0 0 1.5rem;
+    padding: 0;
+    border: 0;
+    text-align: right;
+    color: #000;
+    font-size: 12pt;
+  }
+}
+
 /* ---- Prose (stories and books) --------------------------------------------- */
 
 .autocomplete-hint {

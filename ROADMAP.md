@@ -135,6 +135,14 @@ it wrote; the origin's owner can delete anything and the next pull follows.
   versions (insert-only; an editor peer ending revision mode ends it
   everywhere; commenters can do neither), and every preview page holding a
   revised line is headed with the set's label ("BLUE REV. 01/10/26").
+  *Locked pages (Oct 1 2026):* "Lock pages" in the scene navigator stores
+  where each page begins with the text as it stood (`page_lock`); the
+  editor follows those lines through later edits with the revision line
+  diff (`mapLines`), so page numbers hold, additions run on to A-pages
+  (2A, 2B) and a page whose opening line is cut closes up. Print follows
+  the locked pages, single-spaced at six lines an inch, each sheet headed
+  with its label; mirrors follow the origin's lock. Left: coloured paper
+  per revision (a print shop matter) and OMITTED pages.
 - **More document types & templates** [editor] — treatment, stage play,
   multi-cam, comic book, prose/novel (Markdown) with matching PDF layouts
   (prose/novel now developed under Directions below).
@@ -145,7 +153,8 @@ it wrote; the origin's owner can delete anything and the next pull follows.
   survives any tool, round-trips through FDX's Number attribute); scenes
   added later show no number until "Number new scenes" gives them
   production numbers (12A, A1). Breakdown, stripboard and call sheets show
-  these labels. Left: locked pages and coloured revision drafts.
+  these labels. Locked pages and revision sets followed (see Revision
+  mode).
 - **Script breakdown** [production] — tag scene elements (cast, props,
   wardrobe, SFX/VFX…) by highlighting preview text (the comment-anchoring
   mechanism); auto-seed cast/locations from the parser; per-scene sheets and

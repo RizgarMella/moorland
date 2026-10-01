@@ -174,6 +174,7 @@ defmodule Moorland.Scripts.Activity do
       shots: script.id |> all_shots() |> Enum.map(&shot_payload/1),
       tasks: script.id |> all_tasks() |> Enum.map(&task_payload/1),
       revision_sets: script.id |> all_revision_sets() |> Enum.map(&revision_payload/1),
+      page_lock: Repo.one(from(s in Script, where: s.id == ^script.id, select: s.page_lock)),
       schedule: schedule_payload(script.id),
       versions: Enum.map(versions, &version_payload/1)
     }
@@ -671,6 +672,18 @@ defmodule Moorland.Scripts.Activity do
         false
       end
 
+    # Locked pages are the origin's to set; a mirror follows. An origin from
+    # before page locks sends no key at all and changes nothing.
+    page_lock? =
+      with true <- Map.has_key?(data, "page_lock"),
+           lock = clean_page_lock(data["page_lock"]),
+           true <- lock != :invalid and lock != mirror.page_lock do
+        from(s in Script, where: s.id == ^mirror.id) |> Repo.update_all(set: [page_lock: lock])
+        true
+      else
+        _ -> false
+      end
+
     schedule? =
       with items when is_list(items) <- data["schedule"],
            nil <- pending_schedule_rev(mirror.id) do
@@ -690,6 +703,7 @@ defmodule Moorland.Scripts.Activity do
     announce_shots(mirror, shots?)
     announce_tasks(mirror, tasks?)
     announce_revisions(mirror, revisions?)
+    if page_lock?, do: Scripts.broadcast(mirror.id, {:script_updated, mirror.id})
     {:ok, mirror}
   end
 
@@ -1044,6 +1058,17 @@ defmodule Moorland.Scripts.Activity do
       "due_on" => item["due_on"]
     }
   end
+
+  defp clean_page_lock(nil), do: nil
+
+  defp clean_page_lock(%{"base" => base, "pages" => pages}) when is_binary(base) do
+    case Scripts.clean_pages(pages) do
+      {:ok, pages} -> %{"base" => base, "pages" => pages}
+      _ -> :invalid
+    end
+  end
+
+  defp clean_page_lock(_other), do: :invalid
 
   defp insert_revision_set(script, item, peer_key, extra) do
     color = clip(item["color"], 40)

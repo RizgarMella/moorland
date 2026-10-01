@@ -60,6 +60,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
       |> load_panel_data()
       |> push_tags()
       |> push_revision()
+      |> push_page_lock()
 
     {:ok, socket, layout: false}
   end
@@ -113,6 +114,9 @@ defmodule MoorlandWeb.ScriptLive.Editor do
 
     push_event(socket, "revision", payload)
   end
+
+  defp push_page_lock(socket),
+    do: push_event(socket, "page_lock", %{lock: socket.assigns.script.page_lock})
 
   defp build_breakdown(socket) do
     if socket.assigns.panel == "breakdown",
@@ -228,6 +232,31 @@ defmodule MoorlandWeb.ScriptLive.Editor do
         do: Scripts.delete_breakdown_tag(scope, script, id)
 
     {:noreply, socket}
+  end
+
+  def handle_event("lock_pages", %{"base" => base, "pages" => pages}, socket) do
+    %{current_scope: scope, script: script} = socket.assigns
+
+    case Scripts.lock_pages(scope, script, base, pages) do
+      {:ok, script} ->
+        {:noreply,
+         socket
+         |> assign(:script, script)
+         |> push_page_lock()
+         |> put_flash(:info, "Pages locked. Additions now run on to A-pages.")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Could not lock the pages.")}
+    end
+  end
+
+  def handle_event("unlock_pages", _params, socket) do
+    %{current_scope: scope, script: script} = socket.assigns
+
+    case Scripts.unlock_pages(scope, script) do
+      {:ok, script} -> {:noreply, socket |> assign(:script, script) |> push_page_lock()}
+      {:error, _} -> {:noreply, put_flash(socket, :error, "Could not unlock the pages.")}
+    end
   end
 
   def handle_event("start_revision", _params, socket) do
@@ -756,7 +785,9 @@ defmodule MoorlandWeb.ScriptLive.Editor do
 
   def handle_info({:script_updated, _id}, socket) do
     {script, role} = Scripts.get_script!(socket.assigns.current_scope, socket.assigns.script.id)
-    {:noreply, assign(socket, script: script, role: role, page_title: script.title)}
+
+    {:noreply,
+     socket |> assign(script: script, role: role, page_title: script.title) |> push_page_lock()}
   end
 
   def handle_info({event, _id}, socket)
@@ -1228,6 +1259,11 @@ defmodule MoorlandWeb.ScriptLive.Editor do
           data-can-comment={to_string(Scripts.can_comment?(@role))}
           data-title={@script.title}
           data-kind={@script.kind}
+          data-can-lock-pages={
+            to_string(
+              Scripts.can_edit?(@role) && is_nil(@script.origin_public_key) && !prose?(@script)
+            )
+          }
           data-user-email={@current_scope.user.email}
           class="relative flex min-h-0 flex-1"
         >

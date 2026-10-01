@@ -1,5 +1,7 @@
 import {
   renderHtml,
+  pageStarts,
+  resolveLocks,
   parse,
   toMarkdown,
   harvestCharacters,
@@ -85,6 +87,8 @@ export const ScreenplayEditor = {
     this.breakdownTags = []
     // Revision mode: the text the current revision set started from.
     this.revision = null
+    // Locked pages: {base, pages}, or null while pages run free.
+    this.pageLock = null
 
     // The content_version our edits are built on - the merge base for saves.
     this.baseVersion = parseInt(this.el.dataset.contentVersion || "0", 10)
@@ -258,6 +262,11 @@ export const ScreenplayEditor = {
       this.refreshVocab()
     })
     this.handleEvent("save_error", () => this.setStatus("saving"))
+    this.handleEvent("page_lock", ({ lock }) => {
+      this.pageLock = lock || null
+      this.renderPreview()
+      this.renderSceneNav()
+    })
     this.handleEvent("revision", (revision) => {
       this.revision = revision && revision.base !== undefined ? revision : null
       this.renderPreview()
@@ -321,11 +330,19 @@ export const ScreenplayEditor = {
       (mark ? `<div class="print-watermark">${mark.replace(/[<>&"]/g, "")}</div>` : "") +
       (this.prose
         ? renderProse(this.textarea.value)
-        : renderHtml(this.textarea.value, { helpers: false, paginate: false }))
+        : this.pageLock
+          ? renderHtml(this.textarea.value, { helpers: false, locks: this.locks() })
+          : renderHtml(this.textarea.value, { helpers: false, paginate: false }))
+    // Locked pages print with their own numbers (12A), a page per locked page.
+    root.classList.toggle("print-locked", !!this.pageLock && !this.prose)
     root.classList.toggle("prose-doc", this.prose)
     root.classList.toggle("podcast-doc", this.el.dataset.kind === "podcast")
     this.markRevised(root)
     root.dataset.revision = this.revision ? this.revision.label : ""
+  },
+
+  locks() {
+    return this.pageLock ? resolveLocks(this.textarea.value, this.pageLock) : null
   },
 
   // Asterisks in the margin for lines changed in the revision being shown.
@@ -548,6 +565,21 @@ export const ScreenplayEditor = {
       bar.appendChild(b)
     }
 
+    if (this.el.dataset.canLockPages === "true") {
+      const lockPages = document.createElement("button")
+      lockPages.type = "button"
+      lockPages.textContent = this.pageLock ? "Unlock pages" : "Lock pages"
+      lockPages.title = this.pageLock
+        ? "Let pages run free again"
+        : "Freeze page numbers: additions run on to A-pages (12A) so revised pages can go out alone"
+      lockPages.addEventListener("click", () => {
+        if (this.pageLock) return this.pushEvent("unlock_pages", {})
+        const text = this.textarea.value
+        this.pushEvent("lock_pages", { base: text, pages: pageStarts(text) })
+      })
+      bar.appendChild(lockPages)
+    }
+
     if (!locked) {
       button(
         "Lock scene numbers",
@@ -654,7 +686,7 @@ export const ScreenplayEditor = {
       this.preview.classList.toggle("podcast-doc", this.el.dataset.kind === "podcast")
       this.preview.innerHTML = this.prose
         ? renderProse(this.textarea.value)
-        : renderHtml(this.textarea.value, { helpers: this.canEdit })
+        : renderHtml(this.textarea.value, { helpers: this.canEdit, locks: this.locks() })
       markTags(this.preview, this.breakdownTags)
       this.markRevised(this.preview)
     }

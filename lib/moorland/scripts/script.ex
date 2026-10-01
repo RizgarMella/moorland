@@ -10,6 +10,8 @@ defmodule Moorland.Scripts.Script do
     # Story-to-script pipeline (see Scripts.Pipeline); nil outside one.
     field :stage, :string
     field :parent_script_id, :integer
+    # Locked pages (see Scripts.lock_pages/3); nil when pages run free.
+    field :page_lock, :map
     field :goal_words, :integer
     field :goal_pages, :integer
 

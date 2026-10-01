@@ -151,3 +151,57 @@ export function labelRevisedPages(container, label) {
   }
   mark()
 }
+
+// Where each line of `base` is in `text` now: a Map of old line -> new line,
+// for lines that survived unchanged. Used to keep locked pages where they
+// were. Past the edit limit, lines that are unique in both texts stand in.
+export function mapLines(base, text) {
+  const fullA = (base || "").split("\n").map(normalize)
+  const fullB = (text || "").split("\n").map(normalize)
+  const map = new Map()
+
+  let start = 0
+  while (start < fullA.length && start < fullB.length && fullA[start] === fullB[start]) {
+    map.set(start, start)
+    start++
+  }
+  let endA = fullA.length
+  let endB = fullB.length
+  while (endA > start && endB > start && fullA[endA - 1] === fullB[endB - 1]) {
+    endA--
+    endB--
+    map.set(endA, endB)
+  }
+  const a = fullA.slice(start, endA)
+  const b = fullB.slice(start, endB)
+
+  const trace = myersTrace(a, b)
+  if (trace === null) {
+    const count = (lines) => lines.reduce((m, l) => m.set(l, (m.get(l) || 0) + 1), new Map())
+    const ca = count(a)
+    const cb = count(b)
+    const where = new Map(b.map((l, i) => [l, i]))
+    a.forEach((l, i) => {
+      if (l.trim() !== "" && ca.get(l) === 1 && cb.get(l) === 1) map.set(i + start, where.get(l) + start)
+    })
+    return map
+  }
+
+  let x = a.length
+  let y = b.length
+  for (let d = trace.length - 1; d >= 0; d--) {
+    const v = trace[d]
+    const k = x - y
+    const prevK = k === -d || (k !== d && v.get(k - 1) < v.get(k + 1)) ? k + 1 : k - 1
+    const prevX = v.get(prevK)
+    const prevY = prevX - prevK
+    while (x > prevX && y > prevY) {
+      x--
+      y--
+      map.set(x + start, y + start)
+    }
+    x = prevX
+    y = prevY
+  }
+  return map
+}

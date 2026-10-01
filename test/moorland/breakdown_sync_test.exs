@@ -222,6 +222,25 @@ defmodule Moorland.BreakdownSyncTest do
       assert sets(ctx.mirror) == []
     end
 
+    test "locked pages follow the origin", ctx do
+      pages = [%{"page" => "2", "line" => 3}]
+      {:ok, origin} = Scripts.lock_pages(ctx.alice, ctx.origin, "BASE", pages)
+      pull(ctx.mirror, origin)
+      assert fresh(ctx.mirror).page_lock == %{"base" => "BASE", "pages" => pages}
+
+      # An origin from before page locks says nothing, and nothing changes.
+      {:ok, data} = Scripts.peer_activity(peer_key(), origin.id, 0)
+
+      {:ok, _} =
+        Activity.apply_from_origin(fresh(ctx.mirror), data |> wire() |> Map.delete("page_lock"))
+
+      assert fresh(ctx.mirror).page_lock != nil
+
+      {:ok, _} = Scripts.unlock_pages(ctx.alice, origin)
+      pull(fresh(ctx.mirror), origin)
+      assert fresh(ctx.mirror).page_lock == nil
+    end
+
     test "commenter peers can neither start nor end revisions", ctx do
       {:ok, blue} = Scripts.start_revision(ctx.alice, ctx.origin)
       :ok = Scripts.set_peer_share(ctx.alice, ctx.origin, ctx.peer.id, "commenter")

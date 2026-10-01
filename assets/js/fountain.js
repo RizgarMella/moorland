@@ -92,6 +92,8 @@ export function splitSceneNumber(heading) {
   return m ? [heading.slice(0, m.index), m[1]] : [heading, null]
 }
 
+import { mapLines } from "./revisions"
+
 // Blanks out /* boneyard */ while preserving line numbering.
 function stripBoneyard(text) {
   return text.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ""))
@@ -203,10 +205,114 @@ function typoSuggestions(elements) {
   return suggestions
 }
 
+// Standard screenplay pagination: ~55 content lines per page, estimating
+// wrapped lines per element type.
+const LINES_PER_PAGE = 55
+const rows = (t, width) => Math.max(1, Math.ceil((t || "").length / width))
+
+function costOf(el) {
+  switch (el.type) {
+    case "scene": return rows(el.text, 60) + 2
+    case "action": return rows(el.text, 60) + 1
+    case "character": return 2
+    case "parenthetical": return rows(el.text, 25)
+    case "dialogue":
+    case "lyric": return rows(el.text, 35)
+    case "transition": return 2
+    case "centered": return 2
+    case "section": return 2
+    case "synopsis": return 1
+    default: return 0
+  }
+}
+
+// 1 -> "A", 26 -> "Z", 27 -> "AA": the letters of A-pages.
+function pageLetters(n) {
+  let out = ""
+  while (n > 0) {
+    n--
+    out = String.fromCharCode(65 + (n % 26)) + out
+    n = Math.floor(n / 26)
+  }
+  return out
+}
+
+// Where pages break: a Map of element index -> the label of the page that
+// element begins (page 1 has none). Unlocked, pages run 2, 3, 4... as the
+// line budget fills. Locked (`locks`: a Map of source line -> page label),
+// each locked page begins at its line whatever came before, and anything
+// that no longer fits runs on to A-pages: 12A, 12B. Pages are never
+// renumbered, so revised pages can be issued on their own.
+export function pageBreaks(elements, locks = null) {
+  const breaks = new Map()
+  let used = 0
+  let pageNo = 1
+  let base = "1"
+  let extra = 0
+  let lastBreak = null
+  const mark = (i, label) => {
+    breaks.set(i, label)
+    lastBreak = i
+    used = 0
+  }
+  const next = () => (locks ? base + pageLetters(++extra) : String(++pageNo))
+
+  elements.forEach((el, i) => {
+    if (el.type === "page-break") {
+      mark(i, next())
+      return
+    }
+    const cost = costOf(el)
+    if (locks && locks.has(el.line) && i > 0) {
+      base = locks.get(el.line)
+      extra = 0
+      // Straight after a forced break, that break opens the locked page.
+      if (used > 0) mark(i, base)
+      else if (lastBreak !== null) mark(lastBreak, base)
+    } else {
+      // Never leave a scene heading or character cue orphaned at a page bottom.
+      const orphanRisk =
+        (el.type === "scene" || el.type === "character") && used + cost + 2 > LINES_PER_PAGE
+      if (used > 0 && (used + cost > LINES_PER_PAGE || orphanRisk)) mark(i, next())
+    }
+    used += cost
+  })
+  return breaks
+}
+
+// What locking the pages records: for each page after the first, its
+// label and the source line it starts on. The text as it stood is kept
+// beside them (the lock's `base`), so lines can be followed as it changes.
+export function pageStarts(text) {
+  const { elements } = parse(text)
+  const starts = []
+  for (const [i, label] of pageBreaks(elements)) {
+    const el = elements[i].type === "page-break" ? elements[i + 1] : elements[i]
+    if (el) starts.push({ page: label, line: el.line })
+  }
+  return starts
+}
+
+// Where each locked page starts now: a Map of source line -> label. Lines
+// are followed from the lock's base text to the text now by a line diff, so
+// a page keeps its place however much moves around it, and a page whose
+// opening line was rewritten or cut closes up into the page before.
+export function resolveLocks(text, lock) {
+  const locks = new Map()
+  if (!lock || !Array.isArray(lock.pages)) return locks
+  const moved = mapLines(lock.base || "", text || "")
+  for (const start of lock.pages) {
+    const line = moved.get(start.line)
+    if (line !== undefined && !locks.has(line)) locks.set(line, start.page)
+  }
+  return locks
+}
+
 // opts.helpers enables the inline chips (time-of-day picker, typo fix) that
 // edit the source; only turn it on for users who can edit.
 // opts.paginate (default true) draws on-screen page boundaries; pass false for
-// print, where the browser paginates for real.
+// print, where the browser paginates for real. opts.locks (from
+// resolveLocks) paginates by locked pages instead.
 export function renderHtml(text, opts = {}) {
   const helpers = !!opts.helpers
   const paginate = opts.paginate !== false
@@ -255,58 +361,27 @@ export function renderHtml(text, opts = {}) {
     )
   }
 
-  // Standard screenplay pagination: ~55 content lines per page, page numbers
-  // top-right starting with page 2. Estimates wrapped lines per element type.
-  const LINES_PER_PAGE = 55
-  const rows = (t, width) => Math.max(1, Math.ceil((t || "").length / width))
-  const costOf = (el) => {
-    switch (el.type) {
-      case "scene": return rows(el.text, 60) + 2
-      case "action": return rows(el.text, 60) + 1
-      case "character": return 2
-      case "parenthetical": return rows(el.text, 25)
-      case "dialogue":
-      case "lyric": return rows(el.text, 35)
-      case "transition": return 2
-      case "centered": return 2
-      case "section": return 2
-      case "synopsis": return 1
-      default: return 0
-    }
-  }
+  const breaks = paginate ? pageBreaks(elements, opts.locks || null) : new Map()
 
   // Once any scene carries a fixed number the script is locked: scenes
   // without one are new and show no number rather than renumbering others.
   const locked = elements.some((el) => el.type === "scene" && el.number)
   let sceneNumber = 0
-  let pageNo = 1
-  let used = 0
-  for (const el of elements) {
+  elements.forEach((el, index) => {
     const ln = `data-line="${el.line}"`
+    const edge = (label) =>
+      `<div class="fp-page-edge" data-page="${escapeHtml(label)}"><span>${escapeHtml(label)}.</span></div>`
 
     if (el.type === "page-break") {
-      pageNo++
-      used = 0
       parts.push(
         paginate
-          ? `<div class="fp-page-edge" ${ln}><span>${pageNo}.</span></div>`
+          ? edge(breaks.get(index)).replace('class="fp-page-edge"', `class="fp-page-edge" ${ln}`)
           : `<div class="fp-forced-break" ${ln}></div>`
       )
-      continue
+      return
     }
 
-    if (paginate) {
-      const cost = costOf(el)
-      // Never leave a scene heading or character cue orphaned at a page bottom.
-      const orphanRisk =
-        (el.type === "scene" || el.type === "character") && used + cost + 2 > LINES_PER_PAGE
-      if (used + cost > LINES_PER_PAGE || orphanRisk) {
-        pageNo++
-        used = 0
-        parts.push(`<div class="fp-page-edge"><span>${pageNo}.</span></div>`)
-      }
-      used += cost
-    }
+    if (breaks.has(index)) parts.push(edge(breaks.get(index)))
 
     switch (el.type) {
       case "scene": {
@@ -355,7 +430,7 @@ export function renderHtml(text, opts = {}) {
         parts.push(`<div class="fp-synopsis" ${ln}>${inline(el.text)}</div>`)
         break
     }
-  }
+  })
 
   if (parts.length === 0) {
     return '<div class="fp-empty">The formatted preview appears here as you write.</div>'

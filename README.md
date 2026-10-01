@@ -81,6 +81,9 @@ click from its line.
 
 ### Revisions
 
+- **Locked pages.** Lock the pages and they keep their numbers: new
+  material runs on to A-pages (12A, 12B) on screen and in print, so you
+  can send out only the pages that changed.
 - **Revision mode.** Once a draft is locked, start a revision and every
   changed line gets an asterisk in the margin, on screen and in print. Sets
   follow the production colours (Blue, Pink, Yellow, Green...), and you can

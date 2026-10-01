@@ -80,4 +80,46 @@ defmodule MoorlandWeb.RevisionLiveTest do
     lv |> element("#clear-revisions") |> render_click()
     refute has_element?(lv, "#revision-chip")
   end
+
+  describe "locked pages" do
+    @pages [%{"page" => "2", "line" => 40}, %{"page" => "3", "line" => 90}]
+
+    test "editors lock and unlock; the lock keeps its base and pages", %{
+      scope: scope,
+      script: script
+    } do
+      assert {:ok, locked} = Scripts.lock_pages(scope, script, "BASE", @pages)
+      assert locked.page_lock == %{"base" => "BASE", "pages" => @pages}
+      assert {:ok, %{page_lock: nil}} = Scripts.unlock_pages(scope, locked)
+
+      viewer = user_fixture()
+      {:ok, _} = Scripts.add_collaborator(scope, script, viewer.email, "commenter")
+
+      assert {:error, :not_allowed} =
+               Scripts.lock_pages(Scope.for_user(viewer), script, "B", @pages)
+    end
+
+    test "nonsense pages are refused", %{scope: scope, script: script} do
+      assert {:error, :invalid_pages} =
+               Scripts.lock_pages(scope, script, "B", [%{"page" => "<b>", "line" => 1}])
+
+      assert {:error, :invalid_pages} =
+               Scripts.lock_pages(scope, script, "B", [%{"page" => "2", "line" => -1}])
+
+      assert {:error, :invalid_pages} = Scripts.lock_pages(scope, script, "B", "all of them")
+      assert {:ok, _} = Scripts.lock_pages(scope, script, "B", [%{"page" => "12AB", "line" => 3}])
+    end
+
+    test "the editor locks pages and tells the preview", %{conn: conn, script: script} do
+      {:ok, lv, _html} = live(conn, ~p"/scripts/#{script.id}")
+      assert_push_event(lv, "page_lock", %{lock: nil})
+      assert has_element?(lv, "#editor-root[data-can-lock-pages=true]")
+
+      render_hook(lv, "lock_pages", %{"base" => "INT. HALL", "pages" => @pages})
+      assert_push_event(lv, "page_lock", %{lock: %{"base" => "INT. HALL", "pages" => _}})
+
+      render_hook(lv, "unlock_pages", %{})
+      assert_push_event(lv, "page_lock", %{lock: nil})
+    end
+  end
 end
