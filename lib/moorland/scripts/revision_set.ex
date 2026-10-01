@@ -10,6 +10,12 @@ defmodule Moorland.Scripts.RevisionSet do
     field :color, :string
     field :base_content, :string, default: ""
 
+    # Peer sync (see Version: sets never change, so synced_at, not revs).
+    field :uid, :string, autogenerate: {Ecto.UUID, :generate, []}
+    field :remote_author, :string
+    field :peer_key, :binary
+    field :synced_at, :utc_datetime
+
     belongs_to :script, Moorland.Scripts.Script
     belongs_to :author, Moorland.Accounts.User
 

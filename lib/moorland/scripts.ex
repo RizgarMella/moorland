@@ -961,6 +961,7 @@ defmodule Moorland.Scripts do
       |> case do
         {:ok, set} ->
           broadcast(script.id, {:revisions_changed, script.id})
+          nudge_peers(script)
           {:ok, Repo.preload(set, :author)}
 
         error ->
@@ -972,8 +973,19 @@ defmodule Moorland.Scripts do
   @doc "Ends revision mode: drops every set, so the script is a clean draft again."
   def clear_revisions(%Scope{} = scope, %Script{} = script) do
     with :ok <- authorize(scope, script, :edit) do
+      sets = Repo.all(from(r in RevisionSet, where: r.script_id == ^script.id))
+
+      # On a mirror, the origin hears that revision mode ended.
+      for set <- sets do
+        Activity.remember_deletion(script, "revision_set", %{
+          uid: set.uid,
+          synced_rev: if(set.synced_at || set.peer_key, do: 1, else: 0)
+        })
+      end
+
       from(r in RevisionSet, where: r.script_id == ^script.id) |> Repo.delete_all()
       broadcast(script.id, {:revisions_changed, script.id})
+      nudge_peers(script)
       :ok
     end
   end
@@ -1347,8 +1359,7 @@ defmodule Moorland.Scripts do
   def peer_apply_activity(public_key, script_id, payload) when is_map(payload) do
     case peer_share_for(public_key, script_id) do
       %PeerShare{role: role} when role in ["editor", "commenter"] ->
-        payload =
-          if role == "commenter", do: Map.drop(payload, ["versions", "schedule"]), else: payload
+        payload = if role == "commenter", do: commenter_payload(payload), else: payload
 
         peer = Moorland.Peers.get_by_public_key(public_key)
         Activity.apply_from_peer(peer, Repo.get!(Script, script_id), payload)
@@ -1360,6 +1371,20 @@ defmodule Moorland.Scripts do
       nil ->
         {:error, :not_shared}
     end
+  end
+
+  # A commenter peer annotates: no snapshots, board or revision sets, and no
+  # deleting them either.
+  defp commenter_payload(payload) do
+    payload
+    |> Map.drop(["versions", "schedule", "revision_sets"])
+    |> Map.update("deletions", [], fn
+      items when is_list(items) ->
+        Enum.reject(items, &(is_map(&1) and &1["kind"] == "revision_set"))
+
+      _ ->
+        []
+    end)
   end
 
   ## Peer mirrors (this installation holds a synced copy of a peer's script)

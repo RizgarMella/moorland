@@ -23,6 +23,9 @@ defmodule Moorland.Scripts.Activity do
   no `"tags"` list at all, and a mirror then leaves its tags alone rather
   than reading the silence as "all deleted".
 
+  Revision sets are insert-only, like versions; an editor peer that ends
+  revision mode deletes every set, wherever it was started.
+
   The stripboard travels as a whole board: the origin's replaces a mirror's
   on every pull, unless the mirror has changes of its own still to push;
   a mirror's push replaces the origin's (the last push wins, which suits a
@@ -40,6 +43,7 @@ defmodule Moorland.Scripts.Activity do
     Comment,
     Note,
     ProductionTask,
+    RevisionSet,
     ScheduleItem,
     Script,
     Shot,
@@ -88,6 +92,14 @@ defmodule Moorland.Scripts.Activity do
         )
       )
 
+    {rev_count, rev_max} =
+      Repo.one(
+        from(r in RevisionSet,
+          where: r.script_id == ^script_id,
+          select: {count(r.id), max(r.id)}
+        )
+      )
+
     {task_count, task_max} =
       Repo.one(
         from(t in ProductionTask,
@@ -110,6 +122,7 @@ defmodule Moorland.Scripts.Activity do
     "c#{comment_count}@#{stamp_part(comment_max)}|n#{note_count}@#{stamp_part(note_max)}" <>
       "|t#{tag_count}@#{stamp_part(tag_max)}|s#{item_count}@#{stamp_part(item_max)}" <>
       "|h#{shot_count}@#{stamp_part(shot_max)}|k#{task_count}@#{stamp_part(task_max)}" <>
+      "|r#{rev_count}@#{stamp_part(rev_max)}" <>
       "|v#{version_max || 0}"
   end
 
@@ -160,6 +173,7 @@ defmodule Moorland.Scripts.Activity do
       tags: Enum.map(tags, &tag_payload/1),
       shots: script.id |> all_shots() |> Enum.map(&shot_payload/1),
       tasks: script.id |> all_tasks() |> Enum.map(&task_payload/1),
+      revision_sets: script.id |> all_revision_sets() |> Enum.map(&revision_payload/1),
       schedule: schedule_payload(script.id),
       versions: Enum.map(versions, &version_payload/1)
     }
@@ -235,6 +249,13 @@ defmodule Moorland.Scripts.Activity do
         end
       end)
 
+    revisions? =
+      Enum.reduce(list(payload, "revision_sets"), false, fn item, acc ->
+        if find(RevisionSet, script.id, item["uid"]) == nil,
+          do: insert_revision_set(script, item, key, []) == :ok or acc,
+          else: acc
+      end)
+
     versions? =
       Enum.reduce(list(payload, "versions"), false, fn item, acc ->
         if item["kind"] in @pushed_version_kinds and find(Version, script.id, item["uid"]) == nil,
@@ -255,9 +276,24 @@ defmodule Moorland.Scripts.Activity do
             _ -> nil
           end
 
-        if schema && delete_own(schema, script.id, item["uid"], key),
-          do: MapSet.put(deleted, schema),
-          else: deleted
+        cond do
+          item["kind"] == "revision_set" ->
+            # Ending revision mode is the whole team's switch: any set goes.
+            case find(RevisionSet, script.id, item["uid"]) do
+              nil ->
+                deleted
+
+              set ->
+                Repo.delete(set)
+                MapSet.put(deleted, RevisionSet)
+            end
+
+          schema && delete_own(schema, script.id, item["uid"], key) ->
+            MapSet.put(deleted, schema)
+
+          true ->
+            deleted
+        end
       end)
 
     comments_deleted? = Comment in deleted
@@ -272,6 +308,7 @@ defmodule Moorland.Scripts.Activity do
     changed = announce_tags(script, tags? or tags_deleted?) or changed
     changed = announce_shots(script, shots? or shots_deleted?) or changed
     changed = announce_tasks(script, tasks? or tasks_deleted?) or changed
+    changed = announce_revisions(script, revisions? or RevisionSet in deleted) or changed
 
     changed =
       case payload["schedule"] do
@@ -373,6 +410,15 @@ defmodule Moorland.Scripts.Activity do
         )
       )
 
+    revision_sets =
+      Repo.all(
+        from(r in RevisionSet,
+          where: r.script_id == ^mirror.id and is_nil(r.synced_at) and is_nil(r.peer_key),
+          order_by: [asc: r.id],
+          preload: [:author]
+        )
+      )
+
     schedule_rev = pending_schedule_rev(mirror.id)
 
     %{
@@ -382,6 +428,7 @@ defmodule Moorland.Scripts.Activity do
         tags: Enum.map(tags, &tag_payload/1),
         shots: Enum.map(shots, &shot_payload/1),
         tasks: Enum.map(tasks, &task_payload/1),
+        revision_sets: Enum.map(revision_sets, &revision_payload/1),
         schedule: if(schedule_rev, do: schedule_payload(mirror.id)),
         versions: Enum.map(versions, &version_payload/1),
         deletions: Enum.map(deletions, &Map.take(&1, [:kind, :uid]))
@@ -392,6 +439,7 @@ defmodule Moorland.Scripts.Activity do
         tags: Enum.map(tags, &{&1.id, &1.rev}),
         shots: Enum.map(shots, &{&1.id, &1.rev}),
         tasks: Enum.map(tasks, &{&1.id, &1.rev}),
+        revision_sets: Enum.map(revision_sets, & &1.id),
         schedule: if(schedule_rev, do: {mirror.id, schedule_rev}),
         versions: Enum.map(versions, & &1.id),
         deletions: Enum.map(deletions, & &1.id)
@@ -401,7 +449,7 @@ defmodule Moorland.Scripts.Activity do
 
   def empty?(%{payload: p}) do
     p.comments == [] and p.notes == [] and p.tags == [] and p.shots == [] and p.tasks == [] and
-      p.schedule == nil and
+      p.revision_sets == [] and p.schedule == nil and
       p.versions == [] and p.deletions == []
   end
 
@@ -434,6 +482,11 @@ defmodule Moorland.Scripts.Activity do
       from(t in BreakdownTag, where: t.id == ^id and t.rev == ^rev)
       |> Repo.update_all(set: [synced_rev: rev])
     end
+
+    revision_ids = Map.get(receipt, :revision_sets, [])
+
+    from(r in RevisionSet, where: r.id in ^revision_ids)
+    |> Repo.update_all(set: [synced_at: DateTime.utc_now(:second)])
 
     for {id, rev} <- Map.get(receipt, :tasks, []) do
       from(t in ProductionTask, where: t.id == ^id and t.rev == ^rev)
@@ -593,6 +646,31 @@ defmodule Moorland.Scripts.Activity do
         false
       end
 
+    revisions? =
+      if is_list(data["revision_sets"]) do
+        items = list(data, "revision_sets")
+        now = DateTime.utc_now(:second)
+
+        added =
+          Enum.reduce(items, false, fn item, acc ->
+            if find(RevisionSet, mirror.id, item["uid"]) == nil,
+              do: insert_revision_set(mirror, item, key, synced_at: now) == :ok or acc,
+              else: acc
+          end)
+
+        uids = items |> Enum.map(& &1["uid"]) |> Enum.filter(&is_binary/1)
+
+        {gone, _} =
+          from(r in RevisionSet,
+            where: r.script_id == ^mirror.id and not is_nil(r.synced_at) and r.uid not in ^uids
+          )
+          |> Repo.delete_all()
+
+        added or gone > 0
+      else
+        false
+      end
+
     schedule? =
       with items when is_list(items) <- data["schedule"],
            nil <- pending_schedule_rev(mirror.id) do
@@ -611,6 +689,7 @@ defmodule Moorland.Scripts.Activity do
     announce_schedule(mirror, schedule?)
     announce_shots(mirror, shots?)
     announce_tasks(mirror, tasks?)
+    announce_revisions(mirror, revisions?)
     {:ok, mirror}
   end
 
@@ -966,6 +1045,47 @@ defmodule Moorland.Scripts.Activity do
     }
   end
 
+  defp insert_revision_set(script, item, peer_key, extra) do
+    color = clip(item["color"], 40)
+
+    if is_binary(item["uid"]) and color != "" do
+      %RevisionSet{
+        script_id: script.id,
+        uid: item["uid"],
+        color: color,
+        base_content: to_string(item["base_content"] || ""),
+        remote_author: handle_from(item),
+        peer_key: peer_key,
+        inserted_at: parse_time(item["inserted_at"])
+      }
+      |> Ecto.Changeset.change(extra)
+      |> Repo.insert(on_conflict: :nothing)
+      |> case do
+        {:ok, %RevisionSet{id: id}} when is_integer(id) -> :ok
+        _ -> :skip
+      end
+    else
+      :skip
+    end
+  end
+
+  defp all_revision_sets(script_id) do
+    Repo.all(
+      from(r in RevisionSet,
+        where: r.script_id == ^script_id,
+        order_by: [asc: r.id],
+        preload: [:author]
+      )
+    )
+  end
+
+  defp announce_revisions(script, true) do
+    Scripts.broadcast(script.id, {:revisions_changed, script.id})
+    true
+  end
+
+  defp announce_revisions(_script, false), do: false
+
   defp all_tasks(script_id) do
     Repo.all(
       from(t in ProductionTask,
@@ -1066,6 +1186,16 @@ defmodule Moorland.Scripts.Activity do
         cast_calls: i.cast_calls
       }
     end)
+  end
+
+  defp revision_payload(r) do
+    %{
+      uid: r.uid,
+      color: r.color,
+      base_content: r.base_content,
+      author: handle(r),
+      inserted_at: iso(r.inserted_at)
+    }
   end
 
   defp task_payload(t) do

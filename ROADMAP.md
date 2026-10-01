@@ -130,8 +130,11 @@ it wrote; the origin's owner can delete anything and the next pull follows.
   began from (`RevisionSet`). `revisions.js` diffs that base against the
   live text (Myers, trimmed to the changed middle, ignoring fixed scene
   numbers) and stars changed lines in the preview and in print; any set
-  can be picked to show changes since it began. Left: coloured page
-  headers and page-level locking, and peer sync of the sets.
+  can be picked to show changes since it began. *Sets sync and revised
+  pages are headed (Oct 1 2026):* sets travel between installs like
+  versions (insert-only; an editor peer ending revision mode ends it
+  everywhere; commenters can do neither), and every preview page holding a
+  revised line is headed with the set's label ("BLUE REV. 01/10/26").
 - **More document types & templates** [editor] — treatment, stage play,
   multi-cam, comic book, prose/novel (Markdown) with matching PDF layouts
   (prose/novel now developed under Directions below).
@@ -155,8 +158,8 @@ it wrote; the origin's owner can delete anything and the next pull follows.
   scene sheets (eighths, INT/EXT, time of day, speaking cast seeded) and a
   department view with rename/recategorise. Tags sync between installs
   through `Scripts.Activity` exactly like notes (a peer changes or deletes
-  only its own tags at the origin). Left: CSV export, and the stripboard
-  that grows out of the scene sheets.
+  only its own tags at the origin). CSV export and the stripboard followed
+  (below).
 - **Stripboard / shooting schedule** [production] — scenes as colored strips
   (INT/EXT, day/night, page-eighths from the pagination model) dragged into
   shoot days; grows out of the scene navigator's drag-reorder.

@@ -21,7 +21,7 @@ import { applyUI, autoHideHeader, typewriterOn } from "./ui_prefs"
 import { markTags } from "./breakdown_marks"
 import { renderProse, proseNavList } from "./prose"
 import { harvestNames, suggestNames } from "./prose_names"
-import { changedLines, markRevisions } from "./revisions"
+import { changedLines, markRevisions, labelRevisedPages } from "./revisions"
 
 const AUTOSAVE_MS = 1200
 const SCENE_START_RE = /^(INT\.\/EXT\.|INT\/EXT|INT\.?|EXT\.?|EST\.?|I\/E)\s+/i
@@ -334,6 +334,7 @@ export const ScreenplayEditor = {
     const changed = changedLines(this.revision.base, this.textarea.value)
     container.dataset.revisionColor = this.revision.color
     markRevisions(container, changed)
+    if (container === this.preview) labelRevisedPages(container, this.revision.label)
   },
 
   doExport(format, watermark) {

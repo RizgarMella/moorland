@@ -955,6 +955,27 @@ body.mo-typewriter [data-typewriter] {
 [data-revision-color="salmon"] { --rev: #f97316; }
 [data-revision-color="cherry"] { --rev: #be123c; }
 
+/* A revised page's header: the set's name and date, top left. */
+.fp-rev-label {
+  margin-right: auto;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rev, var(--muted));
+}
+
+.screenplay .fp-page-edge:has(.fp-rev-label) {
+  display: flex;
+  align-items: baseline;
+}
+
+.fp-rev-top {
+  display: flex;
+  margin-bottom: 0.5rem;
+}
+
 .rev-swatch-blue { background: #bfdbfe; }
 .rev-swatch-pink { background: #fbcfe8; }
 .rev-swatch-yellow { background: #fef08a; }

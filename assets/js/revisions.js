@@ -117,3 +117,37 @@ export function markRevisions(container, changed) {
     if (changed.has(parseInt(block.dataset.line, 10))) block.classList.add("fp-revised")
   }
 }
+
+// Heads every page that holds a revised line with the set's label, as
+// revised pages are headed in production ("BLUE REV. 12/10/26"). Pages are
+// the stretches between the preview's page edges; the first page, having no
+// edge above it, gets its label as the container's first child.
+export function labelRevisedPages(container, label) {
+  if (!container || !label) return
+  let edge = null
+  let revised = false
+  const mark = () => {
+    if (!revised) return
+    const tag = document.createElement("span")
+    tag.className = "fp-rev-label"
+    tag.textContent = label
+    if (edge) {
+      edge.prepend(tag)
+    } else {
+      const top = document.createElement("div")
+      top.className = "fp-rev-top"
+      top.appendChild(tag)
+      container.prepend(top)
+    }
+  }
+  for (const child of [...container.children]) {
+    if (child.classList.contains("fp-page-edge")) {
+      mark()
+      edge = child
+      revised = false
+    } else if (child.classList.contains("fp-revised")) {
+      revised = true
+    }
+  }
+  mark()
+}

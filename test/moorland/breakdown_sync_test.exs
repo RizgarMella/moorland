@@ -180,6 +180,62 @@ defmodule Moorland.BreakdownSyncTest do
     assert mirror |> Scripts.list_tasks() |> Enum.map(& &1.title) == ["Hire a boat"]
   end
 
+  describe "revision sets" do
+    defp sets(script), do: script |> Scripts.list_revision_sets() |> Enum.map(& &1.color)
+    defp fresh(script), do: Moorland.Repo.get!(Moorland.Scripts.Script, script.id)
+
+    test "the origin's sets reach the mirror with their base text", ctx do
+      {:ok, blue} = Scripts.start_revision(ctx.alice, ctx.origin)
+      pull(ctx.mirror, ctx.origin)
+
+      assert [copy] = Scripts.list_revision_sets(ctx.mirror)
+      assert %{color: "Blue", base_content: base, synced_at: %DateTime{}} = copy
+      assert base == blue.base_content and copy.uid == blue.uid
+      assert DateTime.compare(copy.inserted_at, blue.inserted_at) == :eq
+    end
+
+    test "a set started on an editor mirror reaches the origin", ctx do
+      {:ok, _} = Scripts.start_revision(ctx.bob, fresh(ctx.mirror))
+      assert {:ok, _} = push(fresh(ctx.mirror), ctx.origin)
+      assert sets(ctx.origin) == ["Blue"]
+      assert Activity.empty?(Activity.pending(fresh(ctx.mirror)))
+
+      pull(fresh(ctx.mirror), ctx.origin)
+      assert sets(ctx.mirror) == ["Blue"]
+    end
+
+    test "ending revision mode on either side ends it everywhere", ctx do
+      {:ok, _} = Scripts.start_revision(ctx.alice, ctx.origin)
+      pull(ctx.mirror, ctx.origin)
+
+      # From the mirror...
+      :ok = Scripts.clear_revisions(ctx.bob, fresh(ctx.mirror))
+      {:ok, _} = push(fresh(ctx.mirror), ctx.origin)
+      assert sets(ctx.origin) == []
+
+      # ...and from the origin.
+      {:ok, _} = Scripts.start_revision(ctx.alice, ctx.origin)
+      pull(fresh(ctx.mirror), ctx.origin)
+      assert sets(ctx.mirror) == ["Blue"]
+      :ok = Scripts.clear_revisions(ctx.alice, ctx.origin)
+      pull(fresh(ctx.mirror), ctx.origin)
+      assert sets(ctx.mirror) == []
+    end
+
+    test "commenter peers can neither start nor end revisions", ctx do
+      {:ok, blue} = Scripts.start_revision(ctx.alice, ctx.origin)
+      :ok = Scripts.set_peer_share(ctx.alice, ctx.origin, ctx.peer.id, "commenter")
+
+      payload = %{
+        "revision_sets" => [%{"uid" => "x", "color" => "Pink", "base_content" => ""}],
+        "deletions" => [%{"kind" => "revision_set", "uid" => blue.uid}]
+      }
+
+      assert {:ok, _} = Scripts.peer_apply_activity(peer_key(), ctx.origin.id, payload)
+      assert sets(ctx.origin) == ["Blue"]
+    end
+  end
+
   test "the origin's tags arrive on the mirror under the author's handle", ctx do
     tag(ctx.alice, ctx.origin, "Brass lamp", "brass lamp")
     pull(ctx.mirror, ctx.origin)
