@@ -20,18 +20,7 @@ defmodule Moorland.Scripts.Breakdown do
   (`%{name, key, tags, auto}`), plus `:unplaced` tags.
   """
   def build(text, tags) do
-    scenes = Stats.scenes(text)
-    lines = normalized_lines(text)
-
-    {placed, unplaced} =
-      Enum.reduce(tags, {%{}, []}, fn tag, {placed, unplaced} ->
-        with line when is_integer(line) <- locate(lines, tag),
-             %{number: number} <- scene_at(scenes, line) do
-          {Map.update(placed, number, [tag], &[tag | &1]), unplaced}
-        else
-          _ -> {placed, [tag | unplaced]}
-        end
-      end)
+    {scenes, placed, unplaced} = place(text, tags)
 
     sheets =
       Enum.map(scenes, fn scene ->
@@ -39,6 +28,30 @@ defmodule Moorland.Scripts.Breakdown do
       end)
 
     %{scenes: sheets, unplaced: Enum.sort_by(unplaced, &{&1.category, &1.name})}
+  end
+
+  @doc """
+  Places anchored records (anything with `anchor_text` and `line_no`, such
+  as tags and shots) in the scenes of `text`. Returns `{scenes, placed,
+  unplaced}` where `placed` maps scene number to its records, in the order
+  given, and `unplaced` lists records whose words have gone.
+  """
+  def place(text, records) do
+    scenes = Stats.scenes(text)
+    lines = normalized_lines(text)
+
+    {placed, unplaced} =
+      Enum.reduce(records, {%{}, []}, fn record, {placed, unplaced} ->
+        with line when is_integer(line) <- locate(lines, record),
+             %{number: number} <- scene_at(scenes, line) do
+          {Map.update(placed, number, [record], &[record | &1]), unplaced}
+        else
+          _ -> {placed, [record | unplaced]}
+        end
+      end)
+
+    placed = Map.new(placed, fn {number, records} -> {number, Enum.reverse(records)} end)
+    {scenes, placed, Enum.reverse(unplaced)}
   end
 
   @doc """

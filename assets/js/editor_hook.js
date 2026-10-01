@@ -154,6 +154,14 @@ export const ScreenplayEditor = {
         }
         this.hideBubble()
       })
+      this.bubble.querySelector("[data-shot]")?.addEventListener("mousedown", (e) => {
+        e.preventDefault()
+        if (this.pendingSelection) {
+          this.pushEvent("shot_selection", this.pendingSelection)
+          window.getSelection()?.removeAllRanges()
+        }
+        this.hideBubble()
+      })
       this.bubble.querySelector("[data-goto]")?.addEventListener("mousedown", (e) => {
         e.preventDefault()
         const selection = this.pendingSelection
@@ -723,7 +731,7 @@ export const ScreenplayEditor = {
         8,
         Math.min(
           rect.left - wrap.left + this.previewWrap.scrollLeft,
-          this.previewWrap.clientWidth - 230
+          this.previewWrap.clientWidth - 300
         )
       )}px`
       this.bubble.hidden = false

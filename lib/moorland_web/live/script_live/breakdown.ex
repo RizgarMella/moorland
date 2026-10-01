@@ -177,6 +177,14 @@ defmodule MoorlandWeb.ScriptLive.Breakdown do
             <p class="mt-0.5 truncate text-sm text-base-content/60">{@script.title}</p>
           </div>
           <.link
+            id="open-shots"
+            navigate={~p"/scripts/#{@script.id}/shots"}
+            class="btn btn-ghost btn-sm"
+            title="Shot list"
+          >
+            <.icon name="hero-video-camera" class="size-4" /><span class="hidden sm:inline">Shots</span>
+          </.link>
+          <.link
             id="open-schedule"
             navigate={~p"/scripts/#{@script.id}/schedule"}
             class="btn btn-ghost btn-sm"

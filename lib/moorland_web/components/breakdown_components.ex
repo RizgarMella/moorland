@@ -64,6 +64,13 @@ defmodule MoorlandWeb.BreakdownComponents do
         <h2 class="text-sm font-semibold">Breakdown</h2>
         <div class="flex items-center gap-3">
           <.link
+            id="open-shots"
+            navigate={~p"/scripts/#{@script.id}/shots"}
+            class="flex items-center gap-1 text-xs text-base-content/60 transition hover:text-base-content"
+          >
+            Shots
+          </.link>
+          <.link
             id="open-schedule"
             navigate={~p"/scripts/#{@script.id}/schedule"}
             class="flex items-center gap-1 text-xs text-base-content/60 transition hover:text-base-content"

@@ -109,6 +109,42 @@ defmodule Moorland.BreakdownSyncTest do
     assert names(ctx.origin) == ["Lamp"]
   end
 
+  test "shots travel both ways; a peer changes only its own", ctx do
+    {:ok, theirs} =
+      Scripts.create_shot(ctx.alice, ctx.origin, %{
+        anchor_text: "brass lamp",
+        line_no: 2,
+        size: "WS"
+      })
+
+    {:ok, _mine} =
+      Scripts.create_shot(ctx.bob, ctx.mirror, %{
+        anchor_text: "grandfather clock",
+        line_no: 2,
+        size: "CU"
+      })
+
+    {:ok, _} = push(ctx.mirror, ctx.origin)
+    mirror = pull(ctx.mirror, ctx.origin)
+
+    assert ctx.origin |> Scripts.list_shots() |> Enum.map(& &1.size) |> Enum.sort() == [
+             "CU",
+             "WS"
+           ]
+
+    assert mirror |> Scripts.list_shots() |> length() == 2
+
+    # Bob's change to Alice's shot does not stick at the origin.
+    copy = Enum.find(Scripts.list_shots(mirror), &(&1.uid == theirs.uid))
+    {:ok, _} = Scripts.update_shot(ctx.bob, mirror, copy.id, %{"size" => "ECU"})
+    {:ok, _} = push(mirror, ctx.origin)
+    assert Enum.find(Scripts.list_shots(ctx.origin), &(&1.uid == theirs.uid)).size == "WS"
+
+    :ok = Scripts.delete_shot(ctx.alice, ctx.origin, theirs.id)
+    pull(mirror, ctx.origin)
+    assert mirror |> Scripts.list_shots() |> Enum.map(& &1.size) == ["CU"]
+  end
+
   test "the origin's tags arrive on the mirror under the author's handle", ctx do
     tag(ctx.alice, ctx.origin, "Brass lamp", "brass lamp")
     pull(ctx.mirror, ctx.origin)

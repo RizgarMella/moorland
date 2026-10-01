@@ -29,7 +29,8 @@ defmodule Moorland.Scripts do
     BreakdownTag,
     RevisionSet,
     Schedule,
-    ScheduleItem
+    ScheduleItem,
+    Shot
   }
 
   @auto_snapshot_interval_seconds 10 * 60
@@ -693,6 +694,104 @@ defmodule Moorland.Scripts do
       end
     end
   end
+
+  ## Shot lists
+
+  def list_shots(%Script{} = script) do
+    from(s in Shot, where: s.script_id == ^script.id, order_by: [asc: s.position, asc: s.id])
+    |> Repo.all()
+  end
+
+  @doc """
+  Adds a shot anchored to words on a line, after every shot so far (so it
+  ends its scene's list). Anyone who may comment may plan shots.
+  """
+  def create_shot(%Scope{user: user} = scope, %Script{} = script, attrs) do
+    with :ok <- authorize(scope, script, :comment) do
+      attrs = stringify(attrs)
+      line_no = parse_line(attrs["line_no"])
+
+      anchor =
+        case attrs["anchor_text"] do
+          text when is_binary(text) and text != "" ->
+            Breakdown.fit_anchor(script.content, line_no, text)
+
+          _ ->
+            nil
+        end
+
+      position =
+        (Repo.one(from(s in Shot, where: s.script_id == ^script.id, select: max(s.position))) ||
+           -1) + 1
+
+      %Shot{script_id: script.id, author_id: user.id}
+      |> Shot.changeset(
+        Map.merge(attrs, %{"line_no" => line_no, "anchor_text" => anchor, "position" => position})
+      )
+      |> Repo.insert()
+      |> tap_shots(script)
+    end
+  end
+
+  @doc "Changes a shot's size, angle, movement, lens or description."
+  def update_shot(%Scope{} = scope, %Script{} = script, shot_id, attrs) do
+    with %Shot{} = shot <- own_shot(scope, script, shot_id) do
+      shot
+      |> Shot.changeset(Map.take(stringify(attrs), ~w(size angle movement lens description)))
+      |> Ecto.Changeset.put_change(:rev, shot.rev + 1)
+      |> Repo.update()
+      |> tap_shots(script)
+    end
+  end
+
+  @doc "Swaps two shots' places, to move one up or down its scene's list."
+  def swap_shots(%Scope{} = scope, %Script{} = script, shot_id, other_id) do
+    with %Shot{} = a <- own_shot(scope, script, shot_id),
+         %Shot{} = b <- get_by_id(Shot, other_id),
+         true <- b.script_id == script.id do
+      {pa, pb} =
+        if a.position == b.position,
+          do: {b.position + 1, a.position},
+          else: {b.position, a.position}
+
+      Repo.transaction(fn ->
+        a |> Ecto.Changeset.change(position: pa, rev: a.rev + 1) |> Repo.update!()
+        b |> Ecto.Changeset.change(position: pb, rev: b.rev + 1) |> Repo.update!()
+      end)
+      |> tap_shots(script)
+    else
+      _ -> {:error, :not_found}
+    end
+  end
+
+  def delete_shot(%Scope{} = scope, %Script{} = script, shot_id) do
+    with %Shot{} = shot <- own_shot(scope, script, shot_id) do
+      Activity.remember_deletion(script, "shot", shot)
+      Repo.delete(shot) |> tap_shots(script)
+      :ok
+    end
+  end
+
+  # A shot its author, or anyone who may edit the script, may change.
+  defp own_shot(%Scope{user: user} = scope, script, shot_id) do
+    case get_by_id(Shot, shot_id) do
+      %Shot{script_id: sid} = shot when sid == script.id ->
+        if shot.author_id == user.id or :ok == authorize(scope, script, :edit),
+          do: shot,
+          else: {:error, :not_allowed}
+
+      _ ->
+        {:error, :not_found}
+    end
+  end
+
+  defp tap_shots({:ok, _} = result, script) do
+    broadcast(script.id, {:shots_changed, script.id})
+    nudge_peers(script)
+    result
+  end
+
+  defp tap_shots(result, _script), do: result
 
   ## Revision sets
 

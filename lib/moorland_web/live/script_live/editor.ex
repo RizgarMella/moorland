@@ -188,6 +188,17 @@ defmodule MoorlandWeb.ScriptLive.Editor do
     end
   end
 
+  def handle_event("shot_selection", %{"line" => line, "text" => text}, socket) do
+    %{current_scope: scope, script: script} = socket.assigns
+    text = String.trim(text)
+    attrs = %{anchor_text: text, line_no: line, description: String.slice(text, 0, 2000)}
+
+    case Scripts.create_shot(scope, script, attrs) do
+      {:ok, _shot} -> {:noreply, put_flash(socket, :info, "Shot added to the shot list.")}
+      {:error, _} -> {:noreply, put_flash(socket, :error, "Could not add that shot.")}
+    end
+  end
+
   def handle_event("cancel_tag", _params, socket) do
     {:noreply, assign(socket, :tag_draft, nil)}
   end
@@ -1072,6 +1083,13 @@ defmodule MoorlandWeb.ScriptLive.Editor do
                 title="Tag this for the breakdown: a prop, costume, vehicle, effect…"
               >
                 <.icon name="hero-tag" class="size-3.5" /> Tag
+              </button>
+              <button
+                type="button"
+                data-shot
+                title="Plan a shot on this moment (it goes on the shot list)"
+              >
+                <.icon name="hero-video-camera" class="size-3.5" /> Shot
               </button>
               <button
                 type="button"

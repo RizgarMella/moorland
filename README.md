@@ -104,6 +104,14 @@ locations, and a dialogue balance line from optional gender tags.
   with its text. If the words are cut, the tag is flagged instead of lost.
 - **Spreadsheet export.** Download the whole breakdown as CSV.
 
+### Shot lists
+
+- **Plan shots on the words.** Highlight a moment in the preview and choose
+  **Shot**, or add shots scene by scene on the shot list. Shots are numbered
+  as productions number them (12A, 12B), carry size, angle, movement, lens
+  and a description, stay with their words through rewrites, and print as
+  a clean list.
+
 ### Stripboard
 
 - **Every scene as a strip,** coloured the way paper boards are: white for

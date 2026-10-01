@@ -175,6 +175,12 @@ it wrote; the origin's owner can delete anything and the next pull follows.
 - **Shot lists & storyboards** [production] — per-scene shot tables created by
   highlighting a script line; storyboard images and mood boards stored in the
   data folder.
+  *Shot lists shipped (Oct 1 2026):* **Shot** in the preview's selection
+  bubble, `/scripts/:id/shots` with per-scene shots numbered 12A, 12B (I and
+  O skipped), size/angle/movement/lens/description edited in place, up/down
+  ordering, print layout. Shots anchor to words like tags
+  (`Breakdown.place/2`, `Scripts.ShotList`) and sync between installs like
+  tags. Left: storyboard images and mood boards (file storage).
 - **Media library** [production] — shared reference files in the data folder,
   synced to production peers like scripts are.
 - **Production calendar & tasks** [production] — prep/shoot/post timeline and
