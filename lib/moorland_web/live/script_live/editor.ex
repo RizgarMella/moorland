@@ -5,6 +5,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
 
   import MoorlandWeb.CharacterComponents, only: [characters_tab: 1]
   import MoorlandWeb.ProseReportComponents, only: [prose_report: 1]
+  import MoorlandWeb.SuggestionComponents, only: [suggestions_section: 1]
 
   import MoorlandWeb.RevisionComponents,
     only: [revision_chip: 1, revision_section: 1, revision_label: 1]
@@ -49,6 +50,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
         breakdown: nil,
         notes_kind: "note",
         prose_report: nil,
+        open_suggestion: nil,
         characters: [],
         editing_sheet: nil,
         lineage: if(script.stage, do: Scripts.lineage(scope, script), else: []),
@@ -76,6 +78,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
       peers: Moorland.Peers.list_peers(socket.assigns.current_scope),
       peer_shares: Scripts.list_peer_shares(script),
       bin: Scripts.list_bin(script),
+      suggestions: Scripts.list_open_suggestions(script),
       shelf: Scripts.list_shelf(socket.assigns.current_scope)
     )
   end
@@ -257,6 +260,35 @@ defmodule MoorlandWeb.ScriptLive.Editor do
       {:ok, script} -> {:noreply, socket |> assign(:script, script) |> push_page_lock()}
       {:error, _} -> {:noreply, put_flash(socket, :error, "Could not unlock the pages.")}
     end
+  end
+
+  def handle_event("toggle_suggestion", %{"id" => id}, socket) do
+    case Integer.parse(id) do
+      {id, ""} -> {:noreply, update(socket, :open_suggestion, &if(&1 == id, do: nil, else: id))}
+      _ -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("apply_suggestion", %{"id" => id}, socket) do
+    %{current_scope: scope, script: script} = socket.assigns
+
+    case Scripts.apply_suggestion(scope, script, id) do
+      {:ok, saved} ->
+        {:noreply,
+         socket
+         |> assign(:script, saved)
+         |> push_event("remote_content", %{content: saved.content, version: saved.content_version})
+         |> put_flash(:info, "Suggestion applied.")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Could not apply that suggestion.")}
+    end
+  end
+
+  def handle_event("dismiss_suggestion", %{"id" => id}, socket) do
+    %{current_scope: scope, script: script} = socket.assigns
+    Scripts.dismiss_suggestion(scope, script, id)
+    {:noreply, socket}
   end
 
   def handle_event("start_revision", _params, socket) do
@@ -791,7 +823,13 @@ defmodule MoorlandWeb.ScriptLive.Editor do
   end
 
   def handle_info({event, _id}, socket)
-      when event in [:comments_changed, :notes_changed, :versions_changed, :collaborators_changed] do
+      when event in [
+             :comments_changed,
+             :notes_changed,
+             :versions_changed,
+             :collaborators_changed,
+             :suggestions_changed
+           ] do
     {:noreply, socket |> load_panel_data() |> load_characters()}
   end
 
@@ -1250,6 +1288,13 @@ defmodule MoorlandWeb.ScriptLive.Editor do
               >
                 {length(visible_comments(@comments, false))}
               </span>
+              <span
+                :if={panel == "history" && @suggestions != []}
+                class="rounded-full bg-primary px-1.5 text-[10px] text-primary-content"
+                title="Suggested edits waiting"
+              >
+                {length(@suggestions)}
+              </span>
             </button>
           </div>
         </div>
@@ -1389,6 +1434,12 @@ defmodule MoorlandWeb.ScriptLive.Editor do
           />
           <.lookup_panel :if={@panel == "lookup"} q={@lookup_q} result={@lookup_result} />
           <div :if={@panel == "history"}>
+            <.suggestions_section
+              suggestions={@suggestions}
+              open_id={@open_suggestion}
+              content={@script.content}
+              role={@role}
+            />
             <.revision_section
               sets={@revision_sets}
               shown={shown_revision(assigns)}

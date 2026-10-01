@@ -47,6 +47,7 @@ defmodule Moorland.Scripts.Activity do
     ScheduleItem,
     Script,
     Shot,
+    Suggestion,
     Version
   }
 
@@ -250,6 +251,11 @@ defmodule Moorland.Scripts.Activity do
         end
       end)
 
+    suggestions? =
+      Enum.reduce(list(payload, "suggestions"), false, fn item, acc ->
+        insert_suggestion(script, item, peer) == :ok or acc
+      end)
+
     revisions? =
       Enum.reduce(list(payload, "revision_sets"), false, fn item, acc ->
         if find(RevisionSet, script.id, item["uid"]) == nil,
@@ -310,6 +316,7 @@ defmodule Moorland.Scripts.Activity do
     changed = announce_shots(script, shots? or shots_deleted?) or changed
     changed = announce_tasks(script, tasks? or tasks_deleted?) or changed
     changed = announce_revisions(script, revisions? or RevisionSet in deleted) or changed
+    if suggestions?, do: Scripts.broadcast(script.id, {:suggestions_changed, script.id})
 
     changed =
       case payload["schedule"] do
@@ -1057,6 +1064,57 @@ defmodule Moorland.Scripts.Activity do
       "starts_on" => item["starts_on"],
       "due_on" => item["due_on"]
     }
+  end
+
+  # Suggestions go one way, peer to origin. A peer may have at most
+  # @max_open_suggestions open on a script at once.
+  @max_open_suggestions 20
+
+  defp insert_suggestion(script, item, %Peer{public_key: key} = peer) do
+    open =
+      Repo.aggregate(
+        from(s in Suggestion,
+          where: s.script_id == ^script.id and s.peer_key == ^key and s.status == "open"
+        ),
+        :count
+      )
+
+    content = item["content"]
+
+    cond do
+      not is_binary(item["uid"]) or not is_binary(content) ->
+        :skip
+
+      byte_size(content) > 2_000_000 ->
+        :skip
+
+      open >= @max_open_suggestions ->
+        :skip
+
+      find(Suggestion, script.id, item["uid"]) ->
+        :skip
+
+      true ->
+        %Suggestion{
+          script_id: script.id,
+          uid: item["uid"],
+          message: clip(item["message"], 500),
+          content: content,
+          base_version:
+            if(is_integer(item["base_version"]) and item["base_version"] >= 0,
+              do: item["base_version"],
+              else: 0
+            ),
+          remote_author: handle_from(item),
+          peer_key: key,
+          from_assistant: peer.assistant == true
+        }
+        |> Repo.insert(on_conflict: :nothing)
+        |> case do
+          {:ok, %Suggestion{id: id}} when is_integer(id) -> :ok
+          _ -> :skip
+        end
+    end
   end
 
   defp clean_page_lock(nil), do: nil

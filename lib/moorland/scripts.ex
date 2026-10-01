@@ -32,7 +32,8 @@ defmodule Moorland.Scripts do
     Schedule,
     ScheduleItem,
     Shot,
-    ProductionTask
+    ProductionTask,
+    Suggestion
   }
 
   @auto_snapshot_interval_seconds 10 * 60
@@ -928,6 +929,56 @@ defmodule Moorland.Scripts do
   end
 
   defp tap_tasks(result, _script), do: result
+
+  ## Suggested edits
+
+  def list_open_suggestions(%Script{} = script) do
+    from(s in Suggestion,
+      where: s.script_id == ^script.id and s.status == "open",
+      order_by: [asc: s.id]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Applies a suggestion as the editor deciding it: the proposed text is saved
+  against the version it was written for, so the usual three-way merge keeps
+  everything written since and only the suggested changes land.
+  """
+  def apply_suggestion(%Scope{user: user} = scope, %Script{} = script, id) do
+    with :ok <- authorize(scope, script, :edit),
+         %Suggestion{script_id: sid, status: "open"} = suggestion when sid == script.id <-
+           get_by_id(Suggestion, id),
+         {:ok, saved} <- save_content(scope, script, suggestion.content, suggestion.base_version) do
+      decide(suggestion, "applied", user, script)
+      {:ok, saved}
+    else
+      nil -> {:error, :not_found}
+      %Suggestion{} -> {:error, :not_found}
+      error -> error
+    end
+  end
+
+  def dismiss_suggestion(%Scope{user: user} = scope, %Script{} = script, id) do
+    with :ok <- authorize(scope, script, :edit),
+         %Suggestion{script_id: sid, status: "open"} = suggestion when sid == script.id <-
+           get_by_id(Suggestion, id) do
+      decide(suggestion, "dismissed", user, script)
+      :ok
+    else
+      nil -> {:error, :not_found}
+      %Suggestion{} -> {:error, :not_found}
+      error -> error
+    end
+  end
+
+  defp decide(suggestion, status, user, script) do
+    suggestion
+    |> Ecto.Changeset.change(status: status, decided_by_id: user.id)
+    |> Repo.update!()
+
+    broadcast(script.id, {:suggestions_changed, script.id})
+  end
 
   ## Locked pages
 

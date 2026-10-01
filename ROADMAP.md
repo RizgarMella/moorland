@@ -351,7 +351,12 @@ ships, and what is still open.
   comments and notes so the AI badge survives relaying to other mirrors;
   an assistant's @mentions notify in the app but send no email.
   `test/moorland_web/controllers/assistant_peer_test.exs` plays the
-  assistant over the sealed wire. *Open:* size and rate
+  assistant over the sealed wire. *Suggestions (Oct 1 2026):* a peer may
+  push `suggestions` (proposed text, a message, the version it was written
+  against); they wait in History with the AI badge and their changed
+  lines, and an editor Applies one through the usual three-way merge (so
+  edits made since are kept) or Dismisses it. Twenty open per peer per
+  script at most. *Open:* size and rate
   limits on assistant pushes; whether "may propose edits" is a per-share
   toggle; suggestion records versus plain editor saves.
 - **Podcast and educational scripts** [formats] — podcast episodes (hosts,

@@ -176,4 +176,93 @@ defmodule MoorlandWeb.AssistantPeerTest do
     script = Moorland.Repo.preload(script, :owner)
     Scope.for_user(script.owner)
   end
+
+  describe "suggested edits" do
+    defp suggest(conn, remote, script, uid, content, base, message \\ "Tighten the opening") do
+      call(conn, remote, "activity_push", %{
+        id: script.id,
+        activity: %{
+          suggestions: [
+            %{
+              uid: uid,
+              content: content,
+              base_version: base,
+              message: message,
+              author: "assistant"
+            }
+          ]
+        }
+      })
+    end
+
+    test "an assistant suggests; an editor applies it, keeping edits made since", ctx do
+      %{conn: conn, remote: remote, script: script, scope: scope} = ctx
+      base = script.content_version
+
+      proposed = String.replace(script.content, "The lamp turns.", "The great lamp turns.")
+      assert {200, %{"ok" => true}} = suggest(conn, remote, script, "s-1", proposed, base)
+
+      assert [%{from_assistant: true, message: "Tighten the opening", status: "open"} = s] =
+               Scripts.list_open_suggestions(script)
+
+      # Meanwhile the writer adds a line at the end.
+      {:ok, script} =
+        Scripts.save_content(scope, script, script.content <> "\n\nIt never stops.", base)
+
+      assert {:ok, saved} = Scripts.apply_suggestion(scope, script, s.id)
+      assert saved.content =~ "The great lamp turns." and saved.content =~ "It never stops."
+      assert Scripts.list_open_suggestions(script) == []
+      assert {:error, :not_found} = Scripts.apply_suggestion(scope, saved, s.id)
+    end
+
+    test "dismissing, and who may decide", ctx do
+      %{conn: conn, remote: remote, script: script, scope: scope} = ctx
+      {200, _} = suggest(conn, remote, script, "s-2", "Something else", script.content_version)
+      [s] = Scripts.list_open_suggestions(script)
+
+      commenter = user_fixture()
+      {:ok, _} = Scripts.add_collaborator(scope, script, commenter.email, "commenter")
+
+      assert {:error, :not_allowed} =
+               Scripts.apply_suggestion(Scope.for_user(commenter), script, s.id)
+
+      assert {:error, :not_allowed} =
+               Scripts.dismiss_suggestion(Scope.for_user(commenter), script, s.id)
+
+      assert :ok = Scripts.dismiss_suggestion(scope, script, s.id)
+      assert Scripts.list_open_suggestions(script) == []
+
+      assert Scripts.get_script!(scope, script.id) |> elem(0) |> Map.get(:content) =~
+               "The lamp turns."
+    end
+
+    test "a peer may have twenty open at most, and viewers none", ctx do
+      %{conn: conn, remote: remote, script: script, scope: scope, peer: peer} = ctx
+      for n <- 1..25, do: suggest(conn, remote, script, "bulk-#{n}", "x#{n}", 0)
+      assert length(Scripts.list_open_suggestions(script)) == 20
+
+      :ok = Scripts.set_peer_share(scope, script, peer.id, "viewer")
+      assert {403, _} = suggest(conn, remote, script, "late", "y", 0)
+    end
+
+    test "the History panel shows the suggestion and applies it", ctx do
+      %{conn: conn, remote: remote, script: script, writer: writer} = ctx
+      proposed = String.replace(script.content, "The lamp turns.", "The great lamp turns.")
+      {200, _} = suggest(conn, remote, script, "s-3", proposed, script.content_version)
+      [s] = Scripts.list_open_suggestions(script)
+
+      {:ok, lv, _html} = build_conn() |> log_in_user(writer) |> live(~p"/scripts/#{script.id}")
+      assert has_element?(lv, "button[phx-value-panel=history]", "1")
+      lv |> element("button[phx-value-panel=history]") |> render_click()
+      assert has_element?(lv, "#suggestion-#{s.id}", "Tighten the opening")
+
+      lv |> element("#suggestion-#{s.id} button", "Show changes") |> render_click()
+      assert has_element?(lv, "#suggestion-#{s.id} .text-success", "The great lamp turns.")
+
+      lv |> element("#suggestion-#{s.id} button", "Apply") |> render_click()
+      assert_push_event(lv, "remote_content", %{content: content})
+      assert content =~ "The great lamp turns."
+      refute has_element?(lv, "#suggestion-#{s.id}")
+    end
+  end
 end
