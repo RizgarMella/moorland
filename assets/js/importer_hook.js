@@ -12,6 +12,16 @@ export const ScriptImporter = {
       this.input.value = ""
       if (!file) return
 
+      // A PDF is read on the server: hand it to the LiveView's upload.
+      if (/\.pdf$/i.test(file.name)) {
+        if (file.size > 10_000_000) {
+          this.pushEvent("import_failed", { reason: "That PDF is too large (10 MB max)." })
+          return
+        }
+        this.upload("pdf", [file])
+        return
+      }
+
       if (file.size > 2_000_000) {
         this.pushEvent("import_failed", { reason: "That file is too large (2 MB max)." })
         return

@@ -9,7 +9,17 @@ defmodule MoorlandWeb.ScriptLive.Index do
       Phoenix.PubSub.subscribe(Moorland.PubSub, "user:#{socket.assigns.current_scope.user.id}")
     end
 
-    {:ok, socket |> assign(search_q: "", results: nil) |> refresh(), temporary_assigns: []}
+    {:ok,
+     socket
+     |> assign(search_q: "", results: nil)
+     |> allow_upload(:pdf,
+       accept: ~w(.pdf),
+       max_entries: 1,
+       max_file_size: 10_000_000,
+       auto_upload: true,
+       progress: &handle_pdf_progress/3
+     )
+     |> refresh(), temporary_assigns: []}
   end
 
   @impl true
@@ -64,6 +74,8 @@ defmodule MoorlandWeb.ScriptLive.Index do
       end
     end
   end
+
+  def handle_event("validate_pdf", _params, socket), do: {:noreply, socket}
 
   def handle_event("import_failed", %{"reason" => reason}, socket) do
     {:noreply, put_flash(socket, :error, String.slice(to_string(reason), 0, 200))}
@@ -149,6 +161,62 @@ defmodule MoorlandWeb.ScriptLive.Index do
     </div>
     """
   end
+
+  # A PDF is melted back into Fountain on the server once it has uploaded.
+  defp handle_pdf_progress(:pdf, entry, socket) do
+    if entry.done? do
+      title = entry.client_name |> String.replace(~r/\.pdf$/i, "") |> String.slice(0, 200)
+      title = if String.trim(title) == "", do: "Imported script", else: title
+
+      result =
+        consume_uploaded_entry(socket, entry, fn %{path: path} ->
+          {:ok, path |> File.read!() |> Moorland.Scripts.PdfImport.to_fountain()}
+        end)
+
+      with {:ok, content} <- result,
+           title = title_from_page(content) || title,
+           {:ok, script} <-
+             Scripts.create_script(socket.assigns.current_scope, %{title: title, content: content}) do
+        {:noreply,
+         socket
+         |> put_flash(
+           :info,
+           "Imported from PDF. Check the formatting: a PDF only says where the ink went."
+         )
+         |> push_navigate(to: ~p"/scripts/#{script.id}")}
+      else
+        {:error, %Ecto.Changeset{}} ->
+          {:noreply, put_flash(socket, :error, "Could not create the script.")}
+
+        {:error, reason} ->
+          {:noreply, put_flash(socket, :error, pdf_error(reason))}
+      end
+    else
+      {:noreply, socket}
+    end
+  end
+
+  # The title page knows the title better than the file name does; titles
+  # set in capitals come back in title case.
+  defp title_from_page(content) do
+    case Regex.run(~r/\ATitle:\s*(.+)$/m, content) do
+      [_, title] ->
+        title = String.trim(title)
+
+        if title == String.upcase(title),
+          do: title |> String.split(" ") |> Enum.map_join(" ", &String.capitalize/1),
+          else: title
+
+      nil ->
+        nil
+    end
+  end
+
+  defp pdf_error(:encrypted),
+    do: "That PDF is password-protected; save an unprotected copy and try again."
+
+  defp pdf_error(:not_pdf), do: "That file isn't a PDF."
+  defp pdf_error(_), do: "Couldn't find text in that PDF. Is it a scan, or exported as images?"
 
   @impl true
   def render(assigns) do
@@ -297,12 +365,29 @@ defmodule MoorlandWeb.ScriptLive.Index do
             phx-hook="ScriptImporter"
             phx-update="ignore"
             class="btn btn-ghost"
-            title="Import a .fountain, .txt or Final Draft .fdx file"
+            title="Import a .fountain, .txt, Final Draft .fdx or screenplay PDF"
           >
             <.icon name="hero-arrow-up-tray" class="size-4" /> Import
-            <input type="file" accept=".fountain,.txt,.fdx" class="hidden" />
+            <input type="file" accept=".fountain,.txt,.fdx,.pdf" class="hidden" />
           </label>
         </form>
+
+        <%!-- PDFs go up to the server to be melted; the Import button's hook hands them here. --%>
+        <form id="pdf-import-form" phx-change="validate_pdf" class="hidden">
+          <.live_file_input upload={@uploads.pdf} />
+        </form>
+        <p
+          :for={entry <- @uploads.pdf.entries}
+          id="pdf-progress"
+          class="mt-2 text-xs text-base-content/60"
+        >
+          Reading {entry.client_name}… {entry.progress}%
+        </p>
+        <p :for={err <- upload_errors(@uploads.pdf)} class="mt-2 text-xs text-error">
+          {if err == :too_large,
+            do: "That PDF is too large (10 MB max).",
+            else: "That file couldn't be uploaded."}
+        </p>
 
         <% mirrors = Enum.filter(@scripts, & &1.origin_public_key) %>
         <% mine =

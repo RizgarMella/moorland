@@ -66,6 +66,8 @@ lib/moorland/
   scripts/names.ex         Names in prose (mirrors assets/js/prose_names.js)
   scripts/prose_report.ex  Chapter lengths and style pointers for prose
   scripts/prose_export.ex  Word manuscript and EPUB, zipped with :zip
+  pdf.ex                   Dependency-free PDF reader: positioned text runs
+  scripts/pdf_import.ex    Screenplay PDF to Fountain, by layout
   scripts/schedule.ex      Stripboard as pure functions: matches strips to
                            scenes, numbers cast, totals shoot days, day out
                            of days and call sheets

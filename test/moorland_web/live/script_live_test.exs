@@ -153,4 +153,37 @@ defmodule MoorlandWeb.ScriptLiveTest do
     lv |> element("#assistant-#{peer.id}") |> render_click()
     refute Moorland.Peers.get_peer!(peer.id).assistant
   end
+
+  test "importing a screenplay PDF melts it into a new script", %{conn: conn, scope: scope} do
+    {:ok, lv, _html} = live(conn, ~p"/scripts")
+
+    pdf =
+      file_input(lv, "#pdf-import-form", :pdf, [
+        %{
+          name: "lamp_draft3_FINAL.pdf",
+          content: File.read!("test/fixtures/screenplay.pdf"),
+          type: "application/pdf"
+        }
+      ])
+
+    # The upload ends in navigation to the new script.
+    assert {:error, {:live_redirect, %{to: path}}} = render_upload(pdf, "lamp_draft3_FINAL.pdf")
+
+    [script] = Scripts.list_scripts(scope)
+    assert path == "/scripts/#{script.id}"
+    assert script.title == "The Lamp"
+    assert script.content =~ "INT. LIGHTHOUSE - NIGHT"
+  end
+
+  test "a PDF without text explains itself", %{conn: conn} do
+    {:ok, lv, _html} = live(conn, ~p"/scripts")
+
+    pdf =
+      file_input(lv, "#pdf-import-form", :pdf, [
+        %{name: "scan.pdf", content: "not really a pdf", type: "application/pdf"}
+      ])
+
+    render_upload(pdf, "scan.pdf")
+    assert render(lv) =~ "isn&#39;t a PDF"
+  end
 end

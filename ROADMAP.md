@@ -122,6 +122,19 @@ it wrote; the origin's owner can delete anything and the next pull follows.
 
 - **PDF import ("melt")** [editor] — extract editable Fountain from PDF
   screenplays.
+  *Shipped (Oct 1 2026):* `Moorland.Pdf` is a dependency-free reader
+  (`:zlib` for Flate; object streams, page tree with inherited resources,
+  form XObjects, the text matrix and CTM for real positions, glyph widths,
+  ToUnicode maps or WinAnsi/Differences); `Scripts.PdfImport` rebuilds
+  lines and classes them by indent in character widths (margin, dialogue
+  ~10, parentheticals ~15, cues ~22, transitions right), rejoins wrapped
+  lines, drops page numbers, (MORE) and CONT'D repeats, keeps scene numbers
+  as `#12#`, and reads a first page with no scenes as the title page.
+  Import accepts .pdf (uploaded, melted on the server). Tested against
+  Chromium-printed scripts (exact round trip of scenes, cast and words)
+  and a hand-built Type 1 PDF; scans and encrypted PDFs are refused with a
+  reason. Left: dual dialogue, and PDFs from tools whose layout departs
+  from the standard indents.
 - **Revision mode** [editor] — tracked changes: revision text in a chosen
   color with margin marks, steppable revision sets. Later feeds production's
   locked pages and colored draft revisions.
