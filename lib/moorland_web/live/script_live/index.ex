@@ -48,7 +48,10 @@ defmodule MoorlandWeb.ScriptLive.Index do
         "prose" ->
           %{title: title, kind: "prose"}
 
-        kind when kind in ["podcast", "lesson"] ->
+        "treatment" ->
+          %{title: title, kind: "prose", content: Moorland.Scripts.Script.template("treatment")}
+
+        kind when kind in ["podcast", "lesson", "stageplay", "multicam", "comic"] ->
           %{title: title, kind: kind, content: Moorland.Scripts.Script.template(kind)}
 
         _ ->
@@ -136,15 +139,11 @@ defmodule MoorlandWeb.ScriptLive.Index do
         <div class="flex items-center gap-2 pr-8">
           <span class="min-w-0 truncate font-medium text-base-content">{@script.title}</span>
           <span
-            :if={@script.kind in ["prose", "podcast", "lesson"] or @script.stage}
+            :if={@script.kind != "screenplay" or @script.stage}
             class="shrink-0 rounded bg-base-200 px-1.5 text-[10px] font-medium uppercase tracking-wide text-base-content/60"
           >
             {Moorland.Scripts.Pipeline.label(@script.stage) ||
-              case @script.kind do
-                "podcast" -> "Podcast"
-                "lesson" -> "Lesson"
-                _ -> "Prose"
-              end}
+              Moorland.Scripts.Script.kind_label(@script.kind)}
           </span>
           <span
             :if={@unread > 0}
@@ -389,7 +388,11 @@ defmodule MoorlandWeb.ScriptLive.Index do
           />
           <select name="kind" class="select select-bordered w-36" aria-label="Kind of document">
             <option value="screenplay">Screenplay</option>
+            <option value="stageplay">Stage play</option>
+            <option value="multicam">Multi-camera sitcom</option>
+            <option value="comic">Comic book</option>
             <option value="prose">Story or book</option>
+            <option value="treatment">Treatment</option>
             <option value="podcast">Podcast episode</option>
             <option value="lesson">Lesson or explainer (A/V)</option>
             <optgroup label="Story to script">

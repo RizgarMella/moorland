@@ -159,6 +159,18 @@ it wrote; the origin's owner can delete anything and the next pull follows.
 - **More document types & templates** [editor] — treatment, stage play,
   multi-cam, comic book, prose/novel (Markdown) with matching PDF layouts
   (prose/novel now developed under Directions below).
+  *Shipped (Oct 1 2026):* three Fountain kinds, `stageplay`, `multicam`
+  and `comic`, each with a template, a preview and print layout of its own
+  (a class on the page, no separate renderer), and statistics in Reports.
+  A play counts acts and scenes from `#`/`##` sections. A multi-cam counts
+  double-spaced pages (about two a minute) and keeps breakdowns and sides,
+  since it has sluglines. A comic counts pages, panels and balloons, page
+  by page, and flags pages over six panels and balloons over 25 words.
+  Treatment is a prose template. Screenplay page boundaries are not drawn
+  for these kinds. An older installation can't mirror these kinds; from
+  this version on, a kind from a newer peer opens as a screenplay instead
+  of failing. Left: sides for plays, and a PDF page count that follows each
+  layout's real pagination.
 - **Production drafts** [production] — locked pages, colored revision drafts,
   scene numbers frozen for the shoot (builds on Revision mode).
   *Scene numbers shipped (Sep 30 2026):* "Lock scene numbers" in the scene

@@ -333,16 +333,29 @@ export const ScreenplayEditor = {
         ? renderProse(this.textarea.value)
         : this.el.dataset.kind === "lesson"
           ? renderAV(this.textarea.value)
-          : this.pageLock
+          : this.pageLock && !this.ownLayout()
           ? renderHtml(this.textarea.value, { helpers: false, locks: this.locks() })
           : renderHtml(this.textarea.value, { helpers: false, paginate: false }))
     // Locked pages print with their own numbers (12A), a page per locked page.
     root.classList.toggle("print-locked", !!this.pageLock && !this.prose)
     root.classList.toggle("prose-doc", this.prose)
-    root.classList.toggle("podcast-doc", this.el.dataset.kind === "podcast")
-    root.classList.toggle("av-doc", this.el.dataset.kind === "lesson")
+    this.toggleKindClasses(root)
     this.markRevised(root)
     root.dataset.revision = this.revision ? this.revision.label : ""
+  },
+
+  // Fountain kinds laid out their own way, each by a class on the page.
+  toggleKindClasses(el) {
+    const kind = this.el.dataset.kind
+    el.classList.toggle("podcast-doc", kind === "podcast")
+    el.classList.toggle("av-doc", kind === "lesson")
+    el.classList.toggle("stage-doc", kind === "stageplay")
+    el.classList.toggle("multicam-doc", kind === "multicam")
+    el.classList.toggle("comic-doc", kind === "comic")
+  },
+
+  ownLayout() {
+    return ["stageplay", "multicam", "comic"].includes(this.el.dataset.kind)
   },
 
   locks() {
@@ -687,13 +700,17 @@ export const ScreenplayEditor = {
   renderPreview() {
     if (this.preview) {
       this.preview.classList.toggle("prose-doc", this.prose)
-      this.preview.classList.toggle("podcast-doc", this.el.dataset.kind === "podcast")
-      this.preview.classList.toggle("av-doc", this.el.dataset.kind === "lesson")
+      this.toggleKindClasses(this.preview)
       this.preview.innerHTML = this.prose
         ? renderProse(this.textarea.value, { helpers: this.canEdit })
         : this.el.dataset.kind === "lesson"
           ? renderAV(this.textarea.value)
-          : renderHtml(this.textarea.value, { helpers: this.canEdit, locks: this.locks() })
+          : renderHtml(this.textarea.value, {
+              helpers: this.canEdit,
+              locks: this.locks(),
+              // Screenplay page lengths would mislead a play or a comic.
+              paginate: !this.ownLayout(),
+            })
       markTags(this.preview, this.breakdownTags)
       this.markRevised(this.preview)
     }

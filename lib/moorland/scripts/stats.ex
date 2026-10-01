@@ -306,9 +306,136 @@ defmodule Moorland.Scripts.Stats do
     end
   end
 
-  @doc "`compute/1` for a screenplay, `compute_prose/1` for prose, `compute_podcast/1` for a podcast."
+  # `#` levels by source line: elements/1 keeps a section's text, not its level.
+  defp section_levels(text) do
+    (text || "")
+    |> strip_boneyard()
+    |> String.split("\n")
+    |> Enum.with_index()
+    |> Enum.flat_map(fn {line, i} ->
+      case Regex.run(~r/^\s*(#+)\s*\S/, line) do
+        [_, hashes] -> [{i, String.length(hashes)}]
+        nil -> []
+      end
+    end)
+    |> Map.new()
+  end
+
+  @doc """
+  Statistics for a stage play: `compute/1`'s, with `acts` (`#` sections)
+  and `scene_count` the scenes within them (`##` sections), since a play's
+  scenes are not sluglines. A page still plays about a minute.
+  """
+  def compute_stageplay(text) do
+    levels = section_levels(text) |> Map.values()
+
+    text
+    |> compute()
+    |> Map.merge(%{
+      stage: true,
+      acts: Enum.count(levels, &(&1 == 1)),
+      scene_count: Enum.count(levels, &(&1 == 2)),
+      int_ext: %{int: 0, ext: 0, other: 0},
+      times: [],
+      locations: []
+    })
+  end
+
+  @doc """
+  Statistics for a multi-camera sitcom: `compute/1`'s, with pages in the
+  multi-cam layout (dialogue double-spaced, action in capitals), which runs
+  about two pages a screen minute, and `acts` from `#` sections.
+  """
+  def compute_multicam(text) do
+    stats = compute(text)
+    acts = text |> section_levels() |> Map.values() |> Enum.count(&(&1 == 1))
+    Map.merge(stats, %{multicam: true, pages: stats.pages * 2, acts: acts})
+  end
+
+  @balloon_words 25
+  @page_panels 6
+
+  @doc """
+  Statistics for a comic script: `pages` are the `#` sections (PAGE ONE),
+  panels the `##` sections within them, and balloons every cue (a speaker,
+  CAPTION or SFX) with its words. Each page in `page_list` carries its
+  panel and balloon counts and words; a page over #{@page_panels} panels, or a
+  balloon over #{@balloon_words} words, is crowded (`crowded`, `long_balloons`).
+  """
+  def compute_comic(text) do
+    levels = section_levels(text)
+
+    pages =
+      text
+      |> elements()
+      |> Enum.reduce([], fn
+        {:section, title, line}, acc ->
+          case {Map.get(levels, line), acc} do
+            {1, _} -> [new_page(title) | acc]
+            {2, []} -> [%{new_page("Page") | panels: 1}]
+            {2, [page | rest]} -> [%{page | panels: page.panels + 1} | rest]
+            _ -> acc
+          end
+
+        {:character, _t, _line}, acc ->
+          update_page(
+            acc,
+            &%{&1 | balloons: &1.balloons + 1, balloon_words: [0 | &1.balloon_words]}
+          )
+
+        {:dialogue, t, _line}, acc ->
+          words = length(String.split(t, ~r/\s+/, trim: true))
+
+          update_page(acc, fn page ->
+            balloon_words =
+              case page.balloon_words do
+                [n | rest] -> [n + words | rest]
+                [] -> [words]
+              end
+
+            %{page | words: page.words + words, balloon_words: balloon_words}
+          end)
+
+        _el, acc ->
+          acc
+      end)
+      |> Enum.reverse()
+      |> Enum.map(fn page ->
+        long = Enum.count(page.balloon_words, &(&1 > @balloon_words))
+
+        page
+        |> Map.delete(:balloon_words)
+        |> Map.merge(%{long_balloons: long, crowded: page.panels > @page_panels})
+      end)
+
+    text
+    |> compute()
+    |> Map.merge(%{
+      comic: true,
+      pages: length(pages),
+      page_list: pages,
+      panels: pages |> Enum.map(& &1.panels) |> Enum.sum(),
+      balloons: pages |> Enum.map(& &1.balloons) |> Enum.sum(),
+      minutes: 0,
+      scene_count: 0,
+      int_ext: %{int: 0, ext: 0, other: 0},
+      times: [],
+      locations: []
+    })
+  end
+
+  defp new_page(title),
+    do: %{title: title, panels: 0, balloons: 0, words: 0, balloon_words: []}
+
+  defp update_page([], fun), do: [fun.(new_page("Page"))]
+  defp update_page([page | rest], fun), do: [fun.(page) | rest]
+
+  @doc "`compute/1` for a screenplay, or the statistics that suit the document's kind."
   def compute_for(%{kind: "prose"}, text), do: compute_prose(text)
   def compute_for(%{kind: "podcast"}, text), do: compute_podcast(text)
+  def compute_for(%{kind: "stageplay"}, text), do: compute_stageplay(text)
+  def compute_for(%{kind: "multicam"}, text), do: compute_multicam(text)
+  def compute_for(%{kind: "comic"}, text), do: compute_comic(text)
 
   # A lesson is timed like a podcast: narration at speaking pace, by part.
   def compute_for(%{kind: "lesson"}, text),

@@ -68,6 +68,15 @@ click from its line.
 - **Lessons and explainers.** A two-column audio/visual script, what we
   see beside what we hear, with learning objectives up top and each part
   timed by its narration.
+- **Stage plays, multi-cams and comics.** Each starts from its own template
+  and reads the way its industry expects. A stage play has centred acts,
+  scenes and speakers, with stage directions set in italics. A multi-camera
+  sitcom has underlined sluglines, action in capitals and double-spaced
+  dialogue, and prints each scene on a new page. A comic script is laid out
+  by page and panel, with every balloon numbered for the letterer, and
+  Reports flags crowded pages and long balloons. A **Treatment** starts a
+  prose document with a logline, characters and the story in the present
+  tense.
 - **From idea to script.** Start a work as an idea and grow it stage by
   stage (short story, story, script), each stage its own document, linked
   in a strip above the editor. Starting the script turns every scene of the

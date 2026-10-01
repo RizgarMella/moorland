@@ -37,9 +37,21 @@ defmodule Moorland.Scripts.Script do
   @doc """
   Screenplays are written in Fountain; prose (stories, books) in Markdown;
   podcast episodes in Fountain too, with hosts as cues and segments as
-  sections.
+  sections. Stage plays, multi-camera sitcoms and comic scripts are Fountain
+  as well, laid out their own way: a play's acts and scenes are `#` and
+  `##` sections; a comic's pages and panels are.
   """
-  def kinds, do: ~w(screenplay prose podcast lesson)
+  def kinds, do: ~w(screenplay prose podcast lesson stageplay multicam comic)
+
+  @doc "What each kind is called where a person reads it."
+  def kind_label("screenplay"), do: "Screenplay"
+  def kind_label("prose"), do: "Prose"
+  def kind_label("podcast"), do: "Podcast"
+  def kind_label("lesson"), do: "Lesson"
+  def kind_label("stageplay"), do: "Stage play"
+  def kind_label("multicam"), do: "Multi-cam"
+  def kind_label("comic"), do: "Comic"
+  def kind_label(other), do: to_string(other)
 
   def lesson?(%__MODULE__{kind: "lesson"}), do: true
   def lesson?(_script), do: false
@@ -114,7 +126,152 @@ defmodule Moorland.Scripts.Script do
     """
   end
 
+  def template("stageplay") do
+    """
+    Title: The Keeper
+    Credit: A play in two acts by
+    Author: Your name
+
+    # ACT ONE
+
+    ## Scene 1
+
+    The lamp room of a lighthouse. Night. The great lens turns slowly overhead. ANNA, thirties, sits on the iron stairs with a ledger.
+
+    ANNA
+    Two hundred and twelve.
+
+    TOM
+    (offstage)
+    You'll wear them out, counting.
+
+    TOM enters with two mugs and hands her one.
+
+    ANNA
+    Somebody has to.
+
+    ## Scene 2
+
+    The same. Morning. The lamp is dark.
+
+    # ACT TWO
+
+    ## Scene 1
+
+    The harbour wall. Gulls.
+    """
+  end
+
+  def template("multicam") do
+    """
+    Title: Pilot
+    Credit: Written by
+    Author: Your name
+
+    # COLD OPEN
+
+    INT. LIGHTHOUSE KITCHEN - NIGHT (NIGHT 1)
+
+    ANNA is at the stove. TOM enters, soaked to the skin.
+
+    TOM
+    It's raining sideways.
+
+    ANNA
+    It does that. We live on a rock.
+
+    # ACT ONE
+
+    INT. HARBOUR CAFE - DAY (DAY 1)
+
+    MARGO wipes the counter as ANNA comes in.
+
+    MARGO
+    The usual?
+
+    ANNA
+    Surprise me.
+
+    MARGO
+    (pouring)
+    Surprise.
+    """
+  end
+
+  def template("comic") do
+    """
+    Title: The Keeper #1
+    Credit: Written by
+    Author: Your name
+
+    # PAGE ONE
+
+    ## Panel 1
+
+    Wide. A lighthouse on a black rock, a storm breaking over it. The beam cuts the rain.
+
+    CAPTION
+    Gull Point. The last manned light on the coast.
+
+    ## Panel 2
+
+    Inside the lamp room. ANNA climbs the iron stairs, ledger under her arm.
+
+    ANNA
+    Two hundred and twelve.
+
+    ## Panel 3
+
+    Close on the ledger: a column of numbers, all the same.
+
+    SFX
+    KRAKOOM
+
+    # PAGE TWO
+
+    ## Panel 1
+
+    The lamp flickers.
+    """
+  end
+
+  # Not a kind: a prose document that starts as a treatment.
+  def template("treatment") do
+    """
+    ---
+    title: Treatment title
+    author: Your name
+    ---
+
+    # Logline
+
+    One sentence: who wants what, and what stands in the way.
+
+    # Characters
+
+    **Anna**, thirties, keeper of the last manned light on the coast.
+
+    **Tom**, her brother, who wants to sell it.
+
+    # Story
+
+    Tell the film in the present tense, scene by scene, the way it plays.
+
+    Night at Gull Point. Anna climbs the two hundred and twelve stairs, as she has every night for ten years...
+    """
+  end
+
   def template(_kind), do: ""
+
+  def stageplay?(%__MODULE__{kind: "stageplay"}), do: true
+  def stageplay?(_script), do: false
+
+  def comic?(%__MODULE__{kind: "comic"}), do: true
+  def comic?(_script), do: false
+
+  @doc "Kinds written with scene headings, which breakdowns, sides and schedules read."
+  def sluglines?(%__MODULE__{kind: kind}), do: kind in ["screenplay", "multicam"]
+  def sluglines?(_script), do: false
 
   def prose?(%__MODULE__{kind: "prose"}), do: true
   def prose?(_script), do: false

@@ -903,6 +903,172 @@ body.mo-typewriter [data-typewriter] {
   }
 }
 
+/* ---- Stage plays ---------------------------------------------------------- */
+
+/* The American stage format: acts and scenes centred, each speaker's name
+   centred above lines that run the full measure, and stage directions set
+   in from the left in italics, so a reader never confuses what is said
+   with what is done. */
+.screenplay.stage-doc .fp-section {
+  font-family: inherit;
+  color: var(--ink-strong);
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.stage-doc .fp-section-1 {
+  margin-top: 3rem;
+  text-decoration: underline;
+}
+
+.stage-doc .fp-section-2 {
+  font-weight: 400;
+  margin-top: 1.5rem;
+}
+
+.stage-doc .fp-character {
+  margin: 1rem 0 0;
+  text-align: center;
+}
+
+.stage-doc .fp-dialogue {
+  margin-left: 0;
+  max-width: none;
+}
+
+.stage-doc .fp-paren,
+.stage-doc .fp-action {
+  margin-left: 25ch;
+  max-width: none;
+  font-style: italic;
+}
+
+.stage-doc .fp-paren {
+  margin-top: 0;
+}
+
+/* A slugline in a play reads as a setting. */
+.stage-doc .fp-scene {
+  text-align: center;
+  font-weight: 400;
+}
+
+@media print {
+  .print-screenplay.stage-doc .fp-section-1 ~ .fp-section-1 {
+    break-before: page;
+  }
+}
+
+/* ---- Multi-camera sitcoms ------------------------------------------------- */
+
+/* Multi-cam pages: scene headings underlined, action in capitals, dialogue
+   double-spaced for the table read's notes; in print each scene starts a
+   page. */
+.multicam-doc .fp-scene {
+  text-decoration: underline;
+}
+
+.multicam-doc .fp-action {
+  text-transform: uppercase;
+}
+
+.multicam-doc .fp-dialogue {
+  line-height: 2;
+}
+
+.screenplay.multicam-doc .fp-section {
+  font-family: inherit;
+  color: var(--ink-strong);
+  text-align: center;
+  text-transform: uppercase;
+  text-decoration: underline;
+}
+
+@media print {
+  /* A new act starts a page; so does each scene, unless it opens the act. */
+  .print-screenplay.multicam-doc .fp-scene ~ .fp-section-1,
+  .print-screenplay.multicam-doc .fp-scene ~ .fp-scene:not(.fp-section-1 + .fp-scene) {
+    break-before: page;
+  }
+}
+
+/* ---- Comic scripts -------------------------------------------------------- */
+
+/* Full-script comics: each page a ruled heading, panels in bold, and every
+   balloon numbered within its page (the letterer's count) with the speaker,
+   CAPTION or SFX in a left column. */
+.screenplay.comic-doc {
+  max-width: 70ch;
+}
+
+.comic-doc .fp-section {
+  clear: both;
+  font-family: inherit;
+}
+
+.screenplay.comic-doc .fp-section-1 {
+  counter-reset: balloon;
+  margin: 2.5rem 0 0.25rem;
+  padding-top: 0.5rem;
+  border-top: 2px solid var(--ink-strong);
+  color: var(--ink-strong);
+  font-size: 1rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.screenplay.comic-doc .fp-section-2 {
+  margin: 1.25rem 0 0.25rem;
+  color: var(--ink-strong);
+  font-size: 0.95rem;
+}
+
+.comic-doc .fp-action {
+  clear: both;
+  margin: 0.25rem 0 0.75rem;
+}
+
+.comic-doc .fp-character {
+  float: left;
+  clear: both;
+  width: 16ch;
+  margin: 0;
+  padding: 0.35rem 1ch 0 0;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.comic-doc .fp-character::before {
+  counter-increment: balloon;
+  content: counter(balloon) ". ";
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.comic-doc .fp-dialogue,
+.comic-doc .fp-paren {
+  margin-left: 17ch;
+  max-width: none;
+}
+
+.comic-doc .fp-character + .fp-dialogue,
+.comic-doc .fp-character + .fp-paren {
+  padding-top: 0.35rem;
+}
+
+@media print {
+  .print-screenplay.comic-doc .fp-section-1 {
+    border-top-color: #000;
+    color: #000;
+  }
+
+  .print-screenplay.comic-doc .fp-section-1 ~ .fp-section-1 {
+    break-before: page;
+  }
+}
+
 /* ---- Locked pages in print ------------------------------------------------ */
 
 /* With pages locked the preview's own page breaks are printed, each page

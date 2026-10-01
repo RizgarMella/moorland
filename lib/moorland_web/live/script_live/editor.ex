@@ -948,6 +948,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
   defp podcast?(script), do: Moorland.Scripts.Script.podcast?(script)
   defp lesson?(script), do: Moorland.Scripts.Script.lesson?(script)
   defp screenplay?(script), do: script.kind == "screenplay"
+  defp sluglines?(script), do: Moorland.Scripts.Script.sluglines?(script)
 
   # 90 -> "1:30"
   defp clock(seconds) when is_integer(seconds),
@@ -968,6 +969,33 @@ defmodule MoorlandWeb.ScriptLive.Editor do
       {clock(stats.seconds), "est. runtime"},
       {length(stats.segments), "segments"},
       {length(stats.characters), "speakers"},
+      {stats.words, "words"}
+    ]
+  end
+
+  defp stat_tiles(%{comic: true} = stats) do
+    [
+      {stats.pages, "pages"},
+      {stats.panels, "panels"},
+      {stats.balloons, "balloons"},
+      {stats.words, "words"}
+    ]
+  end
+
+  defp stat_tiles(%{stage: true} = stats) do
+    [
+      {stats.pages, "pages"},
+      {"#{stats.minutes} min", "est. running time"},
+      {"#{stats.acts} / #{stats.scene_count}", "acts / scenes"},
+      {stats.words, "words"}
+    ]
+  end
+
+  defp stat_tiles(%{multicam: true} = stats) do
+    [
+      {stats.pages, "multi-cam pages"},
+      {"#{stats.minutes} min", "est. runtime"},
+      {stats.scene_count, "scenes"},
       {stats.words, "words"}
     ]
   end
@@ -1141,7 +1169,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
               <li :if={prose?(@script)}>
                 <a id="export-epub" href={~p"/scripts/#{@script.id}/export/epub"}>E-book (.epub)</a>
               </li>
-              <li :if={screenplay?(@script)}>
+              <li :if={sluglines?(@script)}>
                 <button phx-click="export" phx-value-format="sides">Script sides (PDF)…</button>
               </li>
             </ul>
@@ -1268,7 +1296,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
                     {"share", "hero-user-plus", "Share"}
                   ]
                   |> Enum.reject(fn {panel, _, _} ->
-                    panel == "breakdown" and not screenplay?(@script)
+                    panel == "breakdown" and not sluglines?(@script)
                   end)
               }
               phx-click="toggle_panel"
@@ -2102,6 +2130,15 @@ defmodule MoorlandWeb.ScriptLive.Editor do
             podcast?(@script) or lesson?(@script) ->
               "Runtime is spoken words at 150 a minute, plus the written length of silent segments."
 
+            @script.kind == "comic" ->
+              "Pages are # sections, panels ## sections; balloons are numbered within each page."
+
+            @script.kind == "stageplay" ->
+              "Acts are # sections and scenes ## sections; a page plays about a minute."
+
+            @script.kind == "multicam" ->
+              "Multi-cam pages are double-spaced: about two to a screen minute."
+
             true ->
               "Estimates use the standard page ≈ one minute of screen time."
           end}
@@ -2227,6 +2264,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
             {cond do
               podcast?(@script) -> "Speakers"
               lesson?(@script) -> "Voices"
+              @script.kind == "comic" -> "Who speaks"
               true -> "Speaking parts"
             end}
           </h3>
@@ -2281,6 +2319,46 @@ defmodule MoorlandWeb.ScriptLive.Editor do
             Dialogue balance: {balance
             |> Enum.map(fn {label, pct} -> "#{label} #{pct}%" end)
             |> Enum.join(" · ")}
+          </p>
+        </div>
+
+        <div :if={@stats[:page_list] not in [nil, []]} id="comic-pages" class="mt-5">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/50">
+            Pages
+          </h3>
+          <table class="mt-2 w-full text-xs">
+            <thead class="text-[10px] uppercase tracking-wide text-base-content/40">
+              <tr>
+                <th class="py-1 pr-2 text-left font-medium"></th>
+                <th class="py-1 text-right font-medium">Panels</th>
+                <th class="py-1 text-right font-medium">Balloons</th>
+                <th class="py-1 text-right font-medium">Words</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-base-200">
+              <tr :for={page <- @stats.page_list}>
+                <td class="max-w-0 truncate py-1 pr-2">{page.title}</td>
+                <td
+                  class={["py-1 text-right tabular-nums", page.crowded && "text-warning"]}
+                  title={page.crowded && "More than six panels: a crowded page"}
+                >
+                  {page.panels}
+                </td>
+                <td class="py-1 text-right tabular-nums">{page.balloons}</td>
+                <td
+                  class={["py-1 text-right tabular-nums", page.long_balloons > 0 && "text-warning"]}
+                  title={
+                    page.long_balloons > 0 &&
+                      "#{page.long_balloons} #{if page.long_balloons == 1, do: "balloon runs", else: "balloons run"} over 25 words"
+                  }
+                >
+                  {page.words}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="mt-1 text-[11px] text-base-content/50">
+            Amber marks a page over six panels, or one with a balloon over 25 words.
           </p>
         </div>
 

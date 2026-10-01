@@ -1763,7 +1763,11 @@ defmodule Moorland.Scripts do
       content: content
     }
     # An origin from before prose sends no kind: it can only be a screenplay.
-    |> Script.changeset(%{title: title, kind: data["kind"] || "screenplay"})
+    # A kind this version doesn't know (from a newer peer) is still Fountain.
+    |> Script.changeset(%{
+      title: title,
+      kind: if(data["kind"] in Script.kinds(), do: data["kind"], else: "screenplay")
+    })
     |> Repo.insert()
     |> tap_mirror()
   end
