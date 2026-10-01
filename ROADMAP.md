@@ -329,7 +329,15 @@ ships, and what is still open.
   flavour: a template, cues as hosts, sections as segments, runtime from
   words at speech rate, and one PDF layout. *Open:* whether educational
   scripts need a two-column audio/visual layout of their own; whether
-  formats share one `kind` field with prose.
+  formats share one `kind` field with prose. *First step shipped (Oct 1
+  2026):* `kind: "podcast"` (one `kind` field shared with prose), chosen on
+  the dashboard and started from `Script.template("podcast")`; cues are
+  hosts, `#` sections are segments; `Stats.compute_podcast/1` times each
+  segment from its dialogue at 150 words a minute, or by its `= 1:00`
+  synopsis when silent (ads, music beds), shown in Reports against the
+  planned length; an audio-script layout (speaker column beside the lines,
+  ruled segments) on screen and in print; shoot tools hidden. Left:
+  educational scripts and their two-column layout.
 - **Story-to-script pipeline** [pipeline] — one project carries a work from
   idea to short story to fleshed-out story to script, with collaborators,
   enterable at any stage (drop a whole story in), and with Moorland helping

@@ -745,6 +745,72 @@ body.mo-typewriter [data-typewriter] {
   border-color: var(--color-base-content);
 }
 
+/* ---- Podcast scripts ------------------------------------------------------ */
+
+/* An audio script: each speaker's name in a left column beside their lines,
+   segments as ruled headings, engineer's cues (action) in small caps. */
+.screenplay.podcast-doc {
+  max-width: 70ch;
+}
+
+.podcast-doc .fp-character {
+  float: left;
+  clear: both;
+  width: 14ch;
+  /* Padding, not margin: the line beside it starts level whatever margins
+     the blocks above leave behind. */
+  margin: 0;
+  padding: 0.9rem 1ch 0 0;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.podcast-doc .fp-dialogue,
+.podcast-doc .fp-paren,
+.podcast-doc .fp-lyric {
+  margin-left: 15ch;
+  max-width: none;
+}
+
+.podcast-doc .fp-character + .fp-dialogue,
+.podcast-doc .fp-character + .fp-paren {
+  margin-top: 0;
+  padding-top: 0.9rem;
+}
+
+.podcast-doc .fp-action {
+  clear: both;
+  margin-left: 15ch;
+  font-variant: small-caps;
+  color: var(--muted);
+}
+
+.podcast-doc .fp-section {
+  clear: both;
+  margin: 2rem 0 0.25rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--color-base-300);
+  color: var(--ink-strong);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.8rem;
+}
+
+.podcast-doc .fp-synopsis {
+  clear: both;
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+}
+
+@media print {
+  .print-screenplay.podcast-doc .fp-section {
+    border-top-color: #000;
+    color: #000;
+  }
+}
+
 /* ---- Prose (stories and books) --------------------------------------------- */
 
 .autocomplete-hint {

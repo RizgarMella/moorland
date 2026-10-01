@@ -58,6 +58,10 @@ page one.
 - **Goals and sprints.** Set word or page goals and watch the progress bar.
   Run a timed writing sprint with a live word count.
 - **Lookup.** Definitions, synonyms and rhymes without leaving the editor.
+- **Podcast episodes.** Start from a template with hosts and segments; the
+  script reads as an audio script, speaker beside each line, and Reports
+  times every segment from its words (or its written length, for ads and
+  music beds) against what you planned.
 - **From idea to script.** Start a work as an idea and grow it stage by
   stage (short story, story, script), each stage its own document, linked
   in a strip above the editor. Starting the script turns every scene of the

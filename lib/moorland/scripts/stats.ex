@@ -231,8 +231,83 @@ defmodule Moorland.Scripts.Stats do
     }
   end
 
-  @doc "`compute/1` for a screenplay, `compute_prose/1` for prose."
+  @speech_wpm 150
+
+  @doc """
+  Statistics for a podcast episode: everything `compute/1` gives, with
+  `characters` as the speakers, plus `segments` (each `#` section with its
+  spoken words, its length, and any length written in its `= 1:30`
+  synopsis) and `seconds` in all. Speech runs at #{@speech_wpm} words a minute;
+  a segment with no speech (an ad break, a music bed) lasts as long as its
+  synopsis says. Only dialogue counts as speech: action lines are cues for
+  the engineer.
+  """
+  def compute_podcast(text) do
+    elements = elements(text)
+
+    segments =
+      elements
+      |> Enum.reduce([], fn
+        {:section, title, _line}, acc ->
+          [%{title: title, words: 0, target: nil} | acc]
+
+        {:synopsis, t, _line}, [%{target: nil} = seg | rest] ->
+          [%{seg | target: parse_duration(t)} | rest]
+
+        {:dialogue, t, _line}, acc ->
+          words = length(String.split(t, ~r/\s+/, trim: true))
+
+          case acc do
+            [] -> [%{title: "Opening", words: words, target: nil}]
+            [seg | rest] -> [%{seg | words: seg.words + words} | rest]
+          end
+
+        _el, acc ->
+          acc
+      end)
+      |> Enum.reverse()
+      |> Enum.map(fn seg ->
+        spoken = round(seg.words * 60 / @speech_wpm)
+        Map.put(seg, :seconds, if(seg.words > 0, do: spoken, else: seg.target || 0))
+      end)
+
+    seconds = segments |> Enum.map(& &1.seconds) |> Enum.sum()
+
+    text
+    |> compute()
+    |> Map.merge(%{
+      podcast: true,
+      segments: segments,
+      seconds: seconds,
+      minutes: if(seconds == 0, do: 0, else: max(1, ceil(seconds / 60))),
+      scene_count: 0,
+      locations: []
+    })
+  end
+
+  @doc "Seconds in a written length: `1:30`, `90s`, `2 min`, `45 sec`; nil if none."
+  def parse_duration(text) do
+    t = text |> String.trim() |> String.downcase()
+
+    cond do
+      m = Regex.run(~r/^(\d+):([0-5]\d)$/, t) ->
+        [_, mins, secs] = m
+        String.to_integer(mins) * 60 + String.to_integer(secs)
+
+      m = Regex.run(~r/^(\d+)\s*(s|sec|secs|seconds)$/, t) ->
+        m |> Enum.at(1) |> String.to_integer()
+
+      m = Regex.run(~r/^(\d+)\s*(m|min|mins|minutes)$/, t) ->
+        (m |> Enum.at(1) |> String.to_integer()) * 60
+
+      true ->
+        nil
+    end
+  end
+
+  @doc "`compute/1` for a screenplay, `compute_prose/1` for prose, `compute_podcast/1` for a podcast."
   def compute_for(%{kind: "prose"}, text), do: compute_prose(text)
+  def compute_for(%{kind: "podcast"}, text), do: compute_podcast(text)
   def compute_for(_script, text), do: compute(text)
 
   defp strip_boneyard(text) do

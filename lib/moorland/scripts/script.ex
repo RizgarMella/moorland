@@ -32,8 +32,53 @@ defmodule Moorland.Scripts.Script do
     timestamps(type: :utc_datetime)
   end
 
-  @doc "Screenplays are written in Fountain; prose (stories, books) in Markdown."
-  def kinds, do: ~w(screenplay prose)
+  @doc """
+  Screenplays are written in Fountain; prose (stories, books) in Markdown;
+  podcast episodes in Fountain too, with hosts as cues and segments as
+  sections.
+  """
+  def kinds, do: ~w(screenplay prose podcast)
+
+  def podcast?(%__MODULE__{kind: "podcast"}), do: true
+  def podcast?(_script), do: false
+
+  @doc "Where a new document of this kind starts."
+  def template("podcast") do
+    """
+    Title: Episode title
+    Credit: Hosted by
+    Author: Your name
+
+    # Cold open
+    = 0:30
+
+    HOST
+    One line that makes them stay.
+
+    # Intro
+
+    HOST
+    Welcome to the show. Today...
+
+    # Segment one
+
+    HOST
+    So tell me how it started.
+
+    GUEST
+    It started with a lamp that went out.
+
+    # Ad break
+    = 1:00
+
+    # Outro
+
+    HOST
+    Thanks for listening.
+    """
+  end
+
+  def template(_kind), do: ""
 
   def prose?(%__MODULE__{kind: "prose"}), do: true
   def prose?(_script), do: false

@@ -811,6 +811,23 @@ defmodule MoorlandWeb.ScriptLive.Editor do
     """
   end
 
+  defp podcast?(script), do: Moorland.Scripts.Script.podcast?(script)
+  defp screenplay?(script), do: not prose?(script) and not podcast?(script)
+
+  # 90 -> "1:30"
+  defp clock(seconds) when is_integer(seconds),
+    do:
+      "#{div(seconds, 60)}:#{seconds |> rem(60) |> Integer.to_string() |> String.pad_leading(2, "0")}"
+
+  defp stat_tiles(%{podcast: true} = stats) do
+    [
+      {clock(stats.seconds), "est. runtime"},
+      {length(stats.segments), "segments"},
+      {length(stats.characters), "speakers"},
+      {stats.words, "words"}
+    ]
+  end
+
   defp stat_tiles(%{prose: true} = stats) do
     [
       {stats.pages, "manuscript pages"},
@@ -972,7 +989,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
                 <button phx-click="export" phx-value-format="html">Web page (.html)</button>
               </li>
               <li><button phx-click="export" phx-value-format="markdown">Markdown (.md)</button></li>
-              <li :if={!prose?(@script)}>
+              <li :if={screenplay?(@script)}>
                 <button phx-click="export" phx-value-format="sides">Script sides (PDF)…</button>
               </li>
             </ul>
@@ -1098,7 +1115,9 @@ defmodule MoorlandWeb.ScriptLive.Editor do
                     {"breakdown", "hero-tag", "Breakdown"},
                     {"share", "hero-user-plus", "Share"}
                   ]
-                  |> Enum.reject(fn {panel, _, _} -> panel == "breakdown" and prose?(@script) end)
+                  |> Enum.reject(fn {panel, _, _} ->
+                    panel == "breakdown" and not screenplay?(@script)
+                  end)
               }
               phx-click="toggle_panel"
               phx-value-panel={panel}
@@ -1884,9 +1903,16 @@ defmodule MoorlandWeb.ScriptLive.Editor do
       <div class="border-b border-base-300 px-4 py-3">
         <h2 class="text-sm font-semibold">Reports</h2>
         <p class="mt-0.5 text-[11px] text-base-content/50">
-          {if prose?(@script),
-            do: "A manuscript page is about 250 words; reading time assumes 230 words a minute.",
-            else: "Estimates use the standard page ≈ one minute of screen time."}
+          {cond do
+            prose?(@script) ->
+              "A manuscript page is about 250 words; reading time assumes 230 words a minute."
+
+            podcast?(@script) ->
+              "Runtime is spoken words at 150 a minute, plus the written length of silent segments."
+
+            true ->
+              "Estimates use the standard page ≈ one minute of screen time."
+          end}
         </p>
       </div>
 
@@ -2006,7 +2032,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
 
         <div :if={@stats.characters != []} class="mt-5">
           <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/50">
-            Speaking parts
+            {if podcast?(@script), do: "Speakers", else: "Speaking parts"}
           </h3>
           <% max_words = @stats.characters |> Enum.map(& &1.words) |> Enum.max() |> max(1) %>
           <div class="mt-2 space-y-2">
@@ -2059,6 +2085,40 @@ defmodule MoorlandWeb.ScriptLive.Editor do
             Dialogue balance: {balance
             |> Enum.map(fn {label, pct} -> "#{label} #{pct}%" end)
             |> Enum.join(" · ")}
+          </p>
+        </div>
+
+        <div :if={@stats[:segments] not in [nil, []]} id="podcast-segments" class="mt-5">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/50">
+            Segments
+          </h3>
+          <table class="mt-2 w-full text-xs">
+            <tbody class="divide-y divide-base-200">
+              <tr :for={seg <- @stats.segments}>
+                <td class="py-1 pr-2">{seg.title}</td>
+                <td
+                  class={[
+                    "py-1 text-right tabular-nums",
+                    seg.target && seg.words > 0 && seg.seconds > seg.target && "text-warning"
+                  ]}
+                  title={seg.target && "Planned #{clock(seg.target)}"}
+                >
+                  {clock(seg.seconds)}<span
+                    :if={seg.target && seg.words > 0}
+                    class="text-base-content/40"
+                  > / {clock(seg.target)}</span>
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="border-t border-base-300 font-semibold">
+                <td class="py-1 pr-2">Total</td>
+                <td class="py-1 text-right tabular-nums">{clock(@stats.seconds)}</td>
+              </tr>
+            </tfoot>
+          </table>
+          <p class="mt-1 text-[11px] text-base-content/50">
+            Speech at 150 words a minute. Give a silent segment its length with a line like <code>= 1:00</code>.
           </p>
         </div>
 

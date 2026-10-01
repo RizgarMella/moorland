@@ -323,6 +323,7 @@ export const ScreenplayEditor = {
         ? renderProse(this.textarea.value)
         : renderHtml(this.textarea.value, { helpers: false, paginate: false }))
     root.classList.toggle("prose-doc", this.prose)
+    root.classList.toggle("podcast-doc", this.el.dataset.kind === "podcast")
     this.markRevised(root)
     root.dataset.revision = this.revision ? this.revision.label : ""
   },
@@ -649,6 +650,7 @@ export const ScreenplayEditor = {
   renderPreview() {
     if (this.preview) {
       this.preview.classList.toggle("prose-doc", this.prose)
+      this.preview.classList.toggle("podcast-doc", this.el.dataset.kind === "podcast")
       this.preview.innerHTML = this.prose
         ? renderProse(this.textarea.value)
         : renderHtml(this.textarea.value, { helpers: this.canEdit })

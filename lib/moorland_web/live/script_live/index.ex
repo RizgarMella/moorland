@@ -31,6 +31,9 @@ defmodule MoorlandWeb.ScriptLive.Index do
         "prose" ->
           %{title: title, kind: "prose"}
 
+        "podcast" ->
+          %{title: title, kind: "podcast", content: Moorland.Scripts.Script.template("podcast")}
+
         _ ->
           %{title: title, kind: "screenplay"}
       end
@@ -110,10 +113,11 @@ defmodule MoorlandWeb.ScriptLive.Index do
         <div class="flex items-center gap-2 pr-8">
           <span class="min-w-0 truncate font-medium text-base-content">{@script.title}</span>
           <span
-            :if={@script.kind == "prose" or @script.stage}
+            :if={@script.kind in ["prose", "podcast"] or @script.stage}
             class="shrink-0 rounded bg-base-200 px-1.5 text-[10px] font-medium uppercase tracking-wide text-base-content/60"
           >
-            {Moorland.Scripts.Pipeline.label(@script.stage) || "Prose"}
+            {Moorland.Scripts.Pipeline.label(@script.stage) ||
+              if(@script.kind == "podcast", do: "Podcast", else: "Prose")}
           </span>
           <span
             :if={@unread > 0}
@@ -270,6 +274,7 @@ defmodule MoorlandWeb.ScriptLive.Index do
           <select name="kind" class="select select-bordered w-36" aria-label="Kind of document">
             <option value="screenplay">Screenplay</option>
             <option value="prose">Story or book</option>
+            <option value="podcast">Podcast episode</option>
             <optgroup label="Story to script">
               <option
                 :for={{stage, label} <- Moorland.Scripts.Pipeline.stages()}
