@@ -45,6 +45,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
         tag_draft: nil,
         breakdown: nil,
         notes_kind: "note",
+        lineage: if(script.stage, do: Scripts.lineage(scope, script), else: []),
         tags: Scripts.list_breakdown_tags(script),
         revision_sets: Scripts.list_revision_sets(script),
         revision_shown: nil,
@@ -234,6 +235,21 @@ defmodule MoorlandWeb.ScriptLive.Editor do
     %{current_scope: scope, script: script} = socket.assigns
     Scripts.clear_revisions(scope, script)
     {:noreply, socket}
+  end
+
+  def handle_event("start_next_stage", _params, socket) do
+    %{current_scope: scope, script: script} = socket.assigns
+
+    case Scripts.start_next_stage(scope, script) do
+      {:ok, next} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "#{Moorland.Scripts.Pipeline.label(next.stage)} started from this.")
+         |> push_navigate(to: ~p"/scripts/#{next.id}")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Could not start the next stage.")}
+    end
   end
 
   def handle_event("comment_on_selection", %{"line" => line, "text" => text}, socket) do
@@ -734,6 +750,67 @@ defmodule MoorlandWeb.ScriptLive.Editor do
 
   defp prose?(script), do: Moorland.Scripts.Script.prose?(script)
 
+  # The story-to-script pipeline this document belongs to: every stage, the
+  # documents at each (linked), this one marked, and the way to the next.
+  attr :script, :map, required: true
+  attr :lineage, :list, required: true
+
+  defp stages_strip(assigns) do
+    alias Moorland.Scripts.Pipeline
+
+    assigns =
+      assign(assigns,
+        stages: Pipeline.stages(),
+        by_stage: Enum.group_by(assigns.lineage, & &1.stage),
+        next: Pipeline.next(assigns.script.stage)
+      )
+
+    ~H"""
+    <nav
+      id="stages-strip"
+      aria-label="Pipeline stages"
+      class="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-base-300 bg-base-200/40 px-3 py-1.5 text-xs"
+    >
+      <%= for {{stage, label}, i} <- Enum.with_index(@stages) do %>
+        <.icon :if={i > 0} name="hero-chevron-right" class="size-3 shrink-0 text-base-content/30" />
+        <% docs = Map.get(@by_stage, stage, []) %>
+        <span
+          :if={docs == []}
+          class="shrink-0 rounded-full px-2 py-0.5 text-base-content/35"
+        >
+          {label}
+        </span>
+        <.link
+          :for={doc <- docs}
+          navigate={~p"/scripts/#{doc.id}"}
+          class={[
+            "shrink-0 rounded-full px-2 py-0.5 transition",
+            doc.id == @script.id && "bg-neutral font-medium text-neutral-content",
+            doc.id != @script.id && "text-base-content/70 hover:bg-base-300"
+          ]}
+          aria-current={doc.id == @script.id && "page"}
+        >
+          {label}
+        </.link>
+      <% end %>
+      <button
+        :if={@next}
+        id="start-next-stage"
+        type="button"
+        phx-click="start_next_stage"
+        class="ml-auto shrink-0 rounded-md px-2 py-0.5 font-medium text-base-content/70 transition hover:bg-base-300 hover:text-base-content"
+        title={
+          if @next == "script",
+            do: "Open a script with a scene stub for every scene, the story kept beside each",
+            else: "Open a copy of this to grow into the next stage"
+        }
+      >
+        Start the {String.downcase(Pipeline.label(@next))} →
+      </button>
+    </nav>
+    """
+  end
+
   defp stat_tiles(%{prose: true} = stats) do
     [
       {stats.pages, "manuscript pages"},
@@ -1044,6 +1121,8 @@ defmodule MoorlandWeb.ScriptLive.Editor do
           </div>
         </div>
       </header>
+
+      <.stages_strip :if={@script.stage} script={@script} lineage={@lineage} />
 
       <div class={["flex min-h-0 flex-1", @panel == "breakdown" && "bd-show"]}>
         <div

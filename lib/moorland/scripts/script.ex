@@ -7,6 +7,9 @@ defmodule Moorland.Scripts.Script do
     field :content, :string, default: ""
     field :content_version, :integer, default: 0
     field :kind, :string, default: "screenplay"
+    # Story-to-script pipeline (see Scripts.Pipeline); nil outside one.
+    field :stage, :string
+    field :parent_script_id, :integer
     field :goal_words, :integer
     field :goal_pages, :integer
 
@@ -35,11 +38,24 @@ defmodule Moorland.Scripts.Script do
   def prose?(%__MODULE__{kind: "prose"}), do: true
   def prose?(_script), do: false
 
+  # A stage is written as one kind: ideas and stories in prose, scripts
+  # as screenplays.
+  defp validate_stage_kind(changeset) do
+    stage = get_field(changeset, :stage)
+    kind = get_field(changeset, :kind)
+
+    if stage && Moorland.Scripts.Pipeline.kind_for(stage) not in [nil, kind],
+      do: add_error(changeset, :stage, "doesn't fit a #{kind}"),
+      else: changeset
+  end
+
   def changeset(script, attrs) do
     script
-    |> cast(attrs, [:title, :content, :goal_words, :goal_pages, :kind])
+    |> cast(attrs, [:title, :content, :goal_words, :goal_pages, :kind, :stage])
     |> validate_required([:title])
     |> validate_inclusion(:kind, kinds())
+    |> validate_inclusion(:stage, Moorland.Scripts.Pipeline.stage_keys())
+    |> validate_stage_kind()
     |> validate_length(:title, max: 200)
     |> validate_number(:goal_words, greater_than_or_equal_to: 0, less_than: 10_000_000)
     |> validate_number(:goal_pages, greater_than_or_equal_to: 0, less_than: 100_000)

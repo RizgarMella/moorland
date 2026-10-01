@@ -25,6 +25,7 @@ defmodule Moorland.Scripts do
     Snippet,
     Notification,
     Activity,
+    Pipeline,
     Breakdown,
     BreakdownTag,
     RevisionSet,
@@ -110,6 +111,62 @@ defmodule Moorland.Scripts do
     |> Script.changeset(attrs)
     |> Repo.insert()
     |> tap_mirror()
+  end
+
+  ## Story-to-script pipeline
+
+  @doc """
+  Starts the stage after this document's: a new document owned by the
+  caller, linked back to this one. The next prose stage starts as a copy to
+  grow; the script starts from `Pipeline.adapt/1`, scene stubs with the
+  story kept beside them. Anyone who can read the document may.
+  """
+  def start_next_stage(%Scope{user: user} = scope, %Script{} = script) do
+    with :ok <- authorize(scope, script, :view),
+         next when is_binary(next) <- Pipeline.next(script.stage) do
+      kind = Pipeline.kind_for(next)
+      content = if kind == "screenplay", do: Pipeline.adapt(script.content), else: script.content
+
+      %Script{owner_id: user.id, parent_script_id: script.id}
+      |> Script.changeset(%{title: script.title, kind: kind, stage: next, content: content})
+      |> Repo.insert()
+      |> tap_mirror()
+    else
+      nil -> {:error, :last_stage}
+      error -> error
+    end
+  end
+
+  @doc """
+  The documents of this one's pipeline the caller can open, in stage order:
+  everything it grew from and everything grown from it.
+  """
+  def lineage(%Scope{} = scope, %Script{} = script) do
+    ancestors = ancestors(script.parent_script_id, [], 20)
+    descendants = descendants([script.id], [], 20)
+
+    (ancestors ++ [script] ++ descendants)
+    |> Enum.uniq_by(& &1.id)
+    |> Enum.filter(&(&1.id == script.id or can_view?(role(scope, &1))))
+    |> Enum.sort_by(&{Pipeline.index(&1.stage) || -1, &1.id})
+  end
+
+  defp ancestors(nil, acc, _budget), do: acc
+  defp ancestors(_id, acc, 0), do: acc
+
+  defp ancestors(id, acc, budget) do
+    case Repo.get(Script, id) do
+      nil -> acc
+      parent -> ancestors(parent.parent_script_id, [parent | acc], budget - 1)
+    end
+  end
+
+  defp descendants([], acc, _budget), do: acc
+  defp descendants(_ids, acc, 0), do: acc
+
+  defp descendants(ids, acc, budget) do
+    children = Repo.all(from(s in Script, where: s.parent_script_id in ^ids))
+    descendants(Enum.map(children, & &1.id), acc ++ children, budget - 1)
   end
 
   def update_script(%Scope{} = scope, %Script{} = script, attrs) do

@@ -58,6 +58,10 @@ page one.
 - **Goals and sprints.** Set word or page goals and watch the progress bar.
   Run a timed writing sprint with a live word count.
 - **Lookup.** Definitions, synonyms and rhymes without leaving the editor.
+- **From idea to script.** Start a work as an idea and grow it stage by
+  stage (short story, story, script), each stage its own document, linked
+  in a strip above the editor. Starting the script turns every scene of the
+  story into a scene stub with the story's own words kept beside it.
 - **Sketches.** Keep premises, characters and scraps that aren't a script
   yet on the Sketches tab of Notes, and start a new script from one when
   it's ready.

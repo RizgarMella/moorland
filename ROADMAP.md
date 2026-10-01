@@ -343,6 +343,14 @@ ships, and what is still open.
   stored as a `character` Note so it syncs to peers. *Open:* lineage fields
   versus a first-class Project schema; whether a peer share covers the whole
   lineage; where the AI peer hooks in to check consistency across stages.
+  *First step shipped (Oct 1 2026), stages part:* `stage` and
+  `parent_script_id` on Script (stage must fit the kind: idea, short story
+  and story are prose, script a screenplay); the dashboard can start a
+  pipeline at any stage; a Stages strip in the editor links the lineage
+  (only documents the caller can open) and starts the next stage, a copy to
+  grow for prose, `Pipeline.adapt/1` for the script (chapters to sections,
+  scenes and breaks to scene stubs with a synopsis and their prose kept in
+  the boneyard). Left: the Characters panel and character specs.
 
 ---
 

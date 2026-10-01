@@ -22,9 +22,20 @@ defmodule MoorlandWeb.ScriptLive.Index do
   @impl true
   def handle_event("create", %{"title" => title} = params, socket) do
     title = if String.trim(title) == "", do: "Untitled", else: String.trim(title)
-    kind = if params["kind"] == "prose", do: "prose", else: "screenplay"
+    # "stage:idea" and friends start a document in the story-to-script pipeline.
+    attrs =
+      case params["kind"] do
+        "stage:" <> stage ->
+          %{title: title, stage: stage, kind: Moorland.Scripts.Pipeline.kind_for(stage)}
 
-    case Scripts.create_script(socket.assigns.current_scope, %{title: title, kind: kind}) do
+        "prose" ->
+          %{title: title, kind: "prose"}
+
+        _ ->
+          %{title: title, kind: "screenplay"}
+      end
+
+    case Scripts.create_script(socket.assigns.current_scope, attrs) do
       {:ok, script} ->
         {:noreply, push_navigate(socket, to: ~p"/scripts/#{script.id}")}
 
@@ -99,10 +110,10 @@ defmodule MoorlandWeb.ScriptLive.Index do
         <div class="flex items-center gap-2 pr-8">
           <span class="min-w-0 truncate font-medium text-base-content">{@script.title}</span>
           <span
-            :if={@script.kind == "prose"}
+            :if={@script.kind == "prose" or @script.stage}
             class="shrink-0 rounded bg-base-200 px-1.5 text-[10px] font-medium uppercase tracking-wide text-base-content/60"
           >
-            Prose
+            {Moorland.Scripts.Pipeline.label(@script.stage) || "Prose"}
           </span>
           <span
             :if={@unread > 0}
@@ -259,6 +270,14 @@ defmodule MoorlandWeb.ScriptLive.Index do
           <select name="kind" class="select select-bordered w-36" aria-label="Kind of document">
             <option value="screenplay">Screenplay</option>
             <option value="prose">Story or book</option>
+            <optgroup label="Story to script">
+              <option
+                :for={{stage, label} <- Moorland.Scripts.Pipeline.stages()}
+                value={"stage:#{stage}"}
+              >
+                {label}
+              </option>
+            </optgroup>
           </select>
           <button type="submit" class="btn btn-neutral">
             <.icon name="hero-plus" class="size-4" /> New script
