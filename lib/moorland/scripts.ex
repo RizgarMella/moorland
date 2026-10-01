@@ -1159,6 +1159,7 @@ defmodule Moorland.Scripts do
          %{
            id: script.id,
            title: script.title,
+           kind: script.kind,
            content: script.content,
            content_version: script.content_version,
            role: role
@@ -1231,13 +1232,16 @@ defmodule Moorland.Scripts do
     Repo.get_by(Script, origin_public_key: public_key, origin_script_id: origin_script_id)
   end
 
-  def create_mirror(%Peer{} = peer, %{
-        "id" => origin_id,
-        "title" => title,
-        "content" => content,
-        "content_version" => version,
-        "role" => role
-      }) do
+  def create_mirror(
+        %Peer{} = peer,
+        %{
+          "id" => origin_id,
+          "title" => title,
+          "content" => content,
+          "content_version" => version,
+          "role" => role
+        } = data
+      ) do
     %Script{
       owner_id: peer.added_by_user_id,
       origin_public_key: peer.public_key,
@@ -1247,7 +1251,8 @@ defmodule Moorland.Scripts do
       origin_role: role,
       content: content
     }
-    |> Script.changeset(%{title: title})
+    # An origin from before prose sends no kind: it can only be a screenplay.
+    |> Script.changeset(%{title: title, kind: data["kind"] || "screenplay"})
     |> Repo.insert()
     |> tap_mirror()
   end

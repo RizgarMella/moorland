@@ -27,6 +27,11 @@ middle. It is free software built on an open format.
 
 ### Writing
 
+Moorland writes screenplays in Fountain and, for **stories and books**,
+prose in Markdown: chapters (`#`) and scenes (`##`) in the navigator, book
+typography on screen, standard manuscript format in print, and the same
+comments, history, goals, sprints and sync.
+
 - **A real page while you type.** Plain text on the left, an industry
   standard screenplay page on the right: Courier, correct margins, scene
   numbers, page breaks and a title page laid out to standard.

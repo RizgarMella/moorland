@@ -745,6 +745,109 @@ body.mo-typewriter [data-typewriter] {
   border-color: var(--color-base-content);
 }
 
+/* ---- Prose (stories and books) --------------------------------------------- */
+
+/* Book typography on screen: a serif, indented paragraphs, chapters set
+   apart, centred scene breaks. Print turns it into standard manuscript. */
+.screenplay.prose-doc {
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  font-size: 17px;
+  line-height: 1.7;
+  max-width: 36em;
+}
+
+.prose-doc .pr-p {
+  margin: 0;
+  text-indent: 1.5em;
+}
+
+.prose-doc .pr-h1 + .pr-p,
+.prose-doc .pr-h2 + .pr-p,
+.prose-doc .pr-h3 + .pr-p,
+.prose-doc .pr-break + .pr-p,
+.prose-doc .pr-quote + .pr-p {
+  text-indent: 0;
+}
+
+.prose-doc .pr-h1 {
+  margin: 3.5rem 0 1.5rem;
+  font-size: 1.6em;
+  font-weight: 600;
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+
+.prose-doc .pr-h1:first-child {
+  margin-top: 0;
+}
+
+.prose-doc .pr-h2 {
+  margin: 2rem 0 0.75rem;
+  font-size: 1.15em;
+  font-weight: 600;
+}
+
+.prose-doc .pr-h3 {
+  margin: 1.5rem 0 0.5rem;
+  font-size: 1em;
+  font-style: italic;
+}
+
+.prose-doc .pr-break {
+  margin: 1.25rem 0;
+  text-align: center;
+  color: var(--muted);
+}
+
+.prose-doc .pr-quote {
+  margin: 0.75rem 2em;
+  font-style: italic;
+}
+
+.prose-doc .pr-empty {
+  color: var(--muted);
+  font-style: italic;
+}
+
+@media print {
+  /* Standard manuscript: 12pt Times, double-spaced, half-inch indents. */
+  .print-screenplay.prose-doc {
+    font-family: "Times New Roman", Times, serif;
+    font-size: 12pt;
+    line-height: 2;
+    max-width: none;
+  }
+
+  .print-screenplay.prose-doc .pr-p {
+    text-indent: 0.5in;
+  }
+
+  /* The first paragraph of a chapter, scene or section is not indented. */
+  .print-screenplay.prose-doc :is(.pr-h1, .pr-h2, .pr-h3, .pr-break, .pr-quote) + .pr-p {
+    text-indent: 0;
+  }
+
+  .print-screenplay.prose-doc .pr-break {
+    color: #000;
+  }
+
+  .print-screenplay.prose-doc .pr-h1 {
+    break-before: page;
+    margin-top: 2in;
+    font-size: 12pt;
+    text-transform: uppercase;
+  }
+
+  .print-screenplay.prose-doc .pr-h1:first-child {
+    break-before: auto;
+  }
+
+  .print-screenplay.prose-doc .pr-h2,
+  .print-screenplay.prose-doc .pr-h3 {
+    font-size: 12pt;
+  }
+}
+
 /* ---- Revision marks -------------------------------------------------------- */
 
 /* A changed line carries an asterisk in the right margin, as revised pages

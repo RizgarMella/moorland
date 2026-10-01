@@ -20,10 +20,11 @@ defmodule MoorlandWeb.ScriptLive.Index do
   def handle_info(_msg, socket), do: {:noreply, socket}
 
   @impl true
-  def handle_event("create", %{"title" => title}, socket) do
+  def handle_event("create", %{"title" => title} = params, socket) do
     title = if String.trim(title) == "", do: "Untitled", else: String.trim(title)
+    kind = if params["kind"] == "prose", do: "prose", else: "screenplay"
 
-    case Scripts.create_script(socket.assigns.current_scope, %{title: title}) do
+    case Scripts.create_script(socket.assigns.current_scope, %{title: title, kind: kind}) do
       {:ok, script} ->
         {:noreply, push_navigate(socket, to: ~p"/scripts/#{script.id}")}
 
@@ -97,6 +98,12 @@ defmodule MoorlandWeb.ScriptLive.Index do
       >
         <div class="flex items-center gap-2 pr-8">
           <span class="min-w-0 truncate font-medium text-base-content">{@script.title}</span>
+          <span
+            :if={@script.kind == "prose"}
+            class="shrink-0 rounded bg-base-200 px-1.5 text-[10px] font-medium uppercase tracking-wide text-base-content/60"
+          >
+            Prose
+          </span>
           <span
             :if={@unread > 0}
             class="shrink-0 rounded-full bg-error px-1.5 text-[10px] font-semibold text-error-content"
@@ -247,8 +254,12 @@ defmodule MoorlandWeb.ScriptLive.Index do
             name="title"
             placeholder="New script title…"
             autocomplete="off"
-            class="input input-bordered flex-1"
+            class="input input-bordered min-w-0 flex-1"
           />
+          <select name="kind" class="select select-bordered w-36" aria-label="Kind of document">
+            <option value="screenplay">Screenplay</option>
+            <option value="prose">Story or book</option>
+          </select>
           <button type="submit" class="btn btn-neutral">
             <.icon name="hero-plus" class="size-4" /> New script
           </button>

@@ -136,15 +136,19 @@ defmodule Moorland.Storage do
       |> String.slice(0, 80)
 
     slug = if slug == "", do: "untitled", else: slug
-    "#{slug} (#{script.id}).fountain"
+    # Prose is Markdown, and is mirrored as such.
+    ext = if Script.prose?(script), do: "md", else: "fountain"
+    "#{slug} (#{script.id}).#{ext}"
   end
 
   defp remove_stale(dir, id) do
     # Wildcard patterns treat backslashes as escapes; normalize for Windows.
-    dir
-    |> Path.join("* (#{id}).fountain")
-    |> String.replace("\\", "/")
-    |> Path.wildcard()
-    |> Enum.each(&File.rm/1)
+    for ext <- ["fountain", "md"] do
+      dir
+      |> Path.join("* (#{id}).#{ext}")
+      |> String.replace("\\", "/")
+      |> Path.wildcard()
+      |> Enum.each(&File.rm/1)
+    end
   end
 end

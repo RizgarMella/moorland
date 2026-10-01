@@ -271,7 +271,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
       if new_panel == "reports",
         do:
           assign(socket,
-            stats: Stats.compute(socket.assigns.script.content),
+            stats: Stats.compute_for(socket.assigns.script, socket.assigns.script.content),
             char_meta: Scripts.list_character_meta(socket.assigns.script)
           ),
         else: socket
@@ -357,7 +357,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
     {:noreply,
      assign(socket, :sprint, %{
        ends_at: System.system_time(:second) + mins * 60,
-       start_words: Stats.compute(socket.assigns.script.content).words,
+       start_words: Stats.compute_for(socket.assigns.script, socket.assigns.script.content).words,
        mins: mins,
        remaining: mins * 60
      })}
@@ -642,7 +642,10 @@ defmodule MoorlandWeb.ScriptLive.Editor do
 
       sprint ->
         remaining = sprint.ends_at - System.system_time(:second)
-        words = Stats.compute(socket.assigns.script.content).words - sprint.start_words
+
+        words =
+          Stats.compute_for(socket.assigns.script, socket.assigns.script.content).words -
+            sprint.start_words
 
         if remaining <= 0 do
           {:noreply,
@@ -661,7 +664,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
 
     socket =
       if socket.assigns.panel == "reports",
-        do: assign(socket, :stats, Stats.compute(content)),
+        do: assign(socket, :stats, Stats.compute_for(socket.assigns.script, content)),
         else: socket
 
     socket = build_breakdown(socket)
@@ -727,6 +730,26 @@ defmodule MoorlandWeb.ScriptLive.Editor do
       AI
     </span>
     """
+  end
+
+  defp prose?(script), do: Moorland.Scripts.Script.prose?(script)
+
+  defp stat_tiles(%{prose: true} = stats) do
+    [
+      {stats.pages, "manuscript pages"},
+      {"#{stats.minutes} min", "reading time"},
+      {stats.chapters, "chapters"},
+      {stats.words, "words"}
+    ]
+  end
+
+  defp stat_tiles(stats) do
+    [
+      {stats.pages, "pages"},
+      {"#{stats.minutes} min", "est. runtime"},
+      {stats.scene_count, "scenes"},
+      {stats.words, "words"}
+    ]
   end
 
   defp role_label(:owner), do: "Owner"
@@ -862,13 +885,17 @@ defmodule MoorlandWeb.ScriptLive.Editor do
                   PDF — “FINAL” watermark
                 </button>
               </li>
-              <li>
+              <li :if={!prose?(@script)}>
                 <button phx-click="export" phx-value-format="fountain">Fountain (.fountain)</button>
               </li>
-              <li><button phx-click="export" phx-value-format="fdx">Final Draft (.fdx)</button></li>
-              <li><button phx-click="export" phx-value-format="html">Web page (.html)</button></li>
+              <li :if={!prose?(@script)}>
+                <button phx-click="export" phx-value-format="fdx">Final Draft (.fdx)</button>
+              </li>
+              <li :if={!prose?(@script)}>
+                <button phx-click="export" phx-value-format="html">Web page (.html)</button>
+              </li>
               <li><button phx-click="export" phx-value-format="markdown">Markdown (.md)</button></li>
-              <li>
+              <li :if={!prose?(@script)}>
                 <button phx-click="export" phx-value-format="sides">Script sides (PDF)…</button>
               </li>
             </ul>
@@ -983,16 +1010,18 @@ defmodule MoorlandWeb.ScriptLive.Editor do
           <div class="flex min-w-16 items-center gap-0.5 overflow-x-auto rounded-lg bg-base-200 p-0.5 lg:shrink-0">
             <button
               :for={
-                {panel, icon, label} <- [
-                  {"comments", "hero-chat-bubble-left", "Comments"},
-                  {"notes", "hero-clipboard-document-list", "Notes"},
-                  {"bin", "hero-archive-box", "Bin"},
-                  {"lookup", "hero-book-open", "Lookup"},
-                  {"history", "hero-clock", "History"},
-                  {"reports", "hero-chart-bar", "Reports"},
-                  {"breakdown", "hero-tag", "Breakdown"},
-                  {"share", "hero-user-plus", "Share"}
-                ]
+                {panel, icon, label} <-
+                  [
+                    {"comments", "hero-chat-bubble-left", "Comments"},
+                    {"notes", "hero-clipboard-document-list", "Notes"},
+                    {"bin", "hero-archive-box", "Bin"},
+                    {"lookup", "hero-book-open", "Lookup"},
+                    {"history", "hero-clock", "History"},
+                    {"reports", "hero-chart-bar", "Reports"},
+                    {"breakdown", "hero-tag", "Breakdown"},
+                    {"share", "hero-user-plus", "Share"}
+                  ]
+                  |> Enum.reject(fn {panel, _, _} -> panel == "breakdown" and prose?(@script) end)
               }
               phx-click="toggle_panel"
               phx-value-panel={panel}
@@ -1027,6 +1056,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
           data-can-edit={to_string(Scripts.can_edit?(@role))}
           data-can-comment={to_string(Scripts.can_comment?(@role))}
           data-title={@script.title}
+          data-kind={@script.kind}
           data-user-email={@current_scope.user.email}
           class="relative flex min-h-0 flex-1"
         >
@@ -1037,12 +1067,18 @@ defmodule MoorlandWeb.ScriptLive.Editor do
               spellcheck="false"
               autocomplete="off"
               readonly={!Scripts.can_edit?(@role)}
-              placeholder="INT. COFFEE SHOP - DAY\n\nStart writing. Scene headings, character names and dialogue are formatted automatically in the preview."
+              placeholder={
+                if prose?(@script),
+                  do:
+                    "# Chapter One\n\nStart writing. Markdown works: # for chapters, ## for scenes, *italics*, and *** for a scene break.",
+                  else:
+                    "INT. COFFEE SHOP - DAY\n\nStart writing. Scene headings, character names and dialogue are formatted automatically in the preview."
+              }
               class="editor-textarea"
             >{@script.content}</textarea>
             <div id="autocomplete-menu" class="autocomplete-menu" hidden></div>
             <button
-              :if={Scripts.can_edit?(@role)}
+              :if={Scripts.can_edit?(@role) && !prose?(@script)}
               id="tidy-button"
               class="tidy-button"
               title="Auto-format loose lines into scene headings, cues and dialogue"
@@ -1769,7 +1805,9 @@ defmodule MoorlandWeb.ScriptLive.Editor do
       <div class="border-b border-base-300 px-4 py-3">
         <h2 class="text-sm font-semibold">Reports</h2>
         <p class="mt-0.5 text-[11px] text-base-content/50">
-          Estimates use the standard page ≈ one minute of screen time.
+          {if prose?(@script),
+            do: "A manuscript page is about 250 words; reading time assumes 230 words a minute.",
+            else: "Estimates use the standard page ≈ one minute of screen time."}
         </p>
       </div>
 
@@ -1817,14 +1855,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
 
         <div class="grid grid-cols-2 gap-2">
           <div
-            :for={
-              {value, label} <- [
-                {@stats.pages, "pages"},
-                {"#{@stats.minutes} min", "est. runtime"},
-                {@stats.scene_count, "scenes"},
-                {@stats.words, "words"}
-              ]
-            }
+            :for={{value, label} <- stat_tiles(@stats)}
             class="rounded-lg border border-base-300 px-3 py-2.5"
           >
             <div class="text-lg font-semibold tabular-nums">{value}</div>

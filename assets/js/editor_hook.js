@@ -19,6 +19,7 @@ import {
 import { fountainToFdx } from "./fdx"
 import { applyUI, autoHideHeader, typewriterOn } from "./ui_prefs"
 import { markTags } from "./breakdown_marks"
+import { renderProse, proseNavList } from "./prose"
 import { changedLines, markRevisions } from "./revisions"
 
 const AUTOSAVE_MS = 1200
@@ -65,6 +66,8 @@ export const ScreenplayEditor = {
     this.scriptId = this.el.dataset.scriptId
     this.canEdit = this.el.dataset.canEdit === "true"
     this.canComment = this.el.dataset.canComment === "true"
+    // Prose (stories, books) is Markdown: no screenplay formatting or cues.
+    this.prose = this.el.dataset.kind === "prose"
     this.textarea = this.el.querySelector("#screenplay-input")
     this.preview = document.getElementById("screenplay-preview")
     this.previewWrap = this.el.querySelector("#preview-wrap")
@@ -315,7 +318,10 @@ export const ScreenplayEditor = {
     const mark = root.dataset.watermark || ""
     root.innerHTML =
       (mark ? `<div class="print-watermark">${mark.replace(/[<>&"]/g, "")}</div>` : "") +
-      renderHtml(this.textarea.value, { helpers: false, paginate: false })
+      (this.prose
+        ? renderProse(this.textarea.value)
+        : renderHtml(this.textarea.value, { helpers: false, paginate: false }))
+    root.classList.toggle("prose-doc", this.prose)
     this.markRevised(root)
     root.dataset.revision = this.revision ? this.revision.label : ""
   },
@@ -338,7 +344,8 @@ export const ScreenplayEditor = {
     } else if (format === "fdx") {
       this.download(`${title}.fdx`, fountainToFdx(this.textarea.value), "text/xml")
     } else if (format === "markdown") {
-      this.download(`${title}.md`, toMarkdown(this.textarea.value), "text/markdown")
+      const markdown = this.prose ? this.textarea.value : toMarkdown(this.textarea.value)
+      this.download(`${title}.md`, markdown, "text/markdown")
     } else if (format === "html") {
       this.download(`${title}.html`, this.buildHtmlExport(title), "text/html")
     } else if (format === "sides") {
@@ -441,13 +448,15 @@ export const ScreenplayEditor = {
 
   renderSceneNav() {
     if (!this.sceneNav || this.sceneNav.hidden) return
-    const rows = navList(this.textarea.value)
+    const rows = this.prose ? proseNavList(this.textarea.value) : navList(this.textarea.value)
     this.sceneNav.innerHTML = ""
 
     if (rows.length === 0) {
       const empty = document.createElement("div")
       empty.className = "scene-nav-empty"
-      empty.textContent = "Scenes, sections and notes appear here as you write."
+      empty.textContent = this.prose
+        ? "Chapters (# headings) and scenes (## headings) appear here as you write."
+        : "Scenes, sections and notes appear here as you write."
       this.sceneNav.appendChild(empty)
       return
     }
@@ -638,7 +647,10 @@ export const ScreenplayEditor = {
 
   renderPreview() {
     if (this.preview) {
-      this.preview.innerHTML = renderHtml(this.textarea.value, { helpers: this.canEdit })
+      this.preview.classList.toggle("prose-doc", this.prose)
+      this.preview.innerHTML = this.prose
+        ? renderProse(this.textarea.value)
+        : renderHtml(this.textarea.value, { helpers: this.canEdit })
       markTags(this.preview, this.breakdownTags)
       this.markRevised(this.preview)
     }
@@ -970,7 +982,7 @@ export const ScreenplayEditor = {
   onKeydown(e) {
     if (this.menu.hidden) {
       if (e.key === "Enter") {
-        if (this.trySmartExpand()) {
+        if (!this.prose && this.trySmartExpand()) {
           e.preventDefault()
           return
         }
@@ -1076,6 +1088,7 @@ export const ScreenplayEditor = {
   },
 
   updateAutocomplete() {
+    if (this.prose) return this.hideMenu()
     const result = this.computeSuggestions()
     if (!result) {
       this.hideMenu()

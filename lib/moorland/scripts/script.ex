@@ -6,6 +6,7 @@ defmodule Moorland.Scripts.Script do
     field :title, :string
     field :content, :string, default: ""
     field :content_version, :integer, default: 0
+    field :kind, :string, default: "screenplay"
     field :goal_words, :integer
     field :goal_pages, :integer
 
@@ -28,10 +29,17 @@ defmodule Moorland.Scripts.Script do
     timestamps(type: :utc_datetime)
   end
 
+  @doc "Screenplays are written in Fountain; prose (stories, books) in Markdown."
+  def kinds, do: ~w(screenplay prose)
+
+  def prose?(%__MODULE__{kind: "prose"}), do: true
+  def prose?(_script), do: false
+
   def changeset(script, attrs) do
     script
-    |> cast(attrs, [:title, :content, :goal_words, :goal_pages])
+    |> cast(attrs, [:title, :content, :goal_words, :goal_pages, :kind])
     |> validate_required([:title])
+    |> validate_inclusion(:kind, kinds())
     |> validate_length(:title, max: 200)
     |> validate_number(:goal_words, greater_than_or_equal_to: 0, less_than: 10_000_000)
     |> validate_number(:goal_pages, greater_than_or_equal_to: 0, less_than: 100_000)

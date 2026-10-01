@@ -49,6 +49,19 @@ defmodule Moorland.StorageTest do
     refute File.exists?(renamed)
   end
 
+  test "prose is mirrored as Markdown, and a change of kind moves the file", %{
+    scope: scope,
+    mirror_dir: mirror_dir
+  } do
+    {:ok, story} = Scripts.create_script(scope, %{title: "Tide", content: "# One", kind: "prose"})
+    md = Path.join(mirror_dir, "Tide (#{story.id}).md")
+    assert File.read!(md) == "# One"
+
+    {:ok, _} = Scripts.update_script(scope, story, %{kind: "screenplay"})
+    refute File.exists?(md)
+    assert File.exists?(Path.join(mirror_dir, "Tide (#{story.id}).fountain"))
+  end
+
   test "mirror_all backfills every script", %{scope: scope, mirror_dir: mirror_dir} do
     {:ok, a} = Scripts.create_script(scope, %{title: "One", content: "a"})
     {:ok, b} = Scripts.create_script(scope, %{title: "Two", content: "b"})

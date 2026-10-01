@@ -194,6 +194,47 @@ defmodule Moorland.Scripts.Stats do
     |> classify()
   end
 
+  @doc """
+  Statistics for prose, in the same shape as `compute/1` so reports, goals
+  and sprints work unchanged: `pages` are manuscript pages (about 250 words
+  each), `minutes` reading time, `chapters` the `#` headings. Markdown marks
+  are not words.
+  """
+  def compute_prose(text) do
+    lines = (text || "") |> strip_boneyard() |> String.split("\n")
+
+    words =
+      lines
+      |> Enum.reject(&Regex.match?(~r/^\s*([*\-_]\s*){3,}$/, &1))
+      |> Enum.map(fn line ->
+        line
+        |> String.replace(~r/^\s*(#+|>)\s*/, "")
+        |> String.replace(~r/[*_]+/, " ")
+        |> String.split(~r/\s+/, trim: true)
+        |> length()
+      end)
+      |> Enum.sum()
+
+    chapters = Enum.count(lines, &Regex.match?(~r/^#\s+\S/, &1))
+
+    %{
+      prose: true,
+      pages: if(words == 0, do: 0, else: max(1, ceil(words / 250))),
+      minutes: if(words == 0, do: 0, else: max(1, ceil(words / 230))),
+      words: words,
+      chapters: chapters,
+      scene_count: 0,
+      int_ext: %{int: 0, ext: 0, other: 0},
+      times: [],
+      characters: [],
+      locations: []
+    }
+  end
+
+  @doc "`compute/1` for a screenplay, `compute_prose/1` for prose."
+  def compute_for(%{kind: "prose"}, text), do: compute_prose(text)
+  def compute_for(_script, text), do: compute(text)
+
   defp strip_boneyard(text) do
     Regex.replace(~r/\/\*[\s\S]*?\*\//, text, fn match ->
       match |> String.replace(~r/[^\n]/, "")

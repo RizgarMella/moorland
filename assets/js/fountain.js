@@ -10,7 +10,7 @@ const TIME_SUFFIXES = [
   "CONTINUOUS", "LATER", "MOMENTS LATER", "SAME", "SUNSET", "SUNRISE",
 ]
 
-function escapeHtml(text) {
+export function escapeHtml(text) {
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -19,7 +19,7 @@ function escapeHtml(text) {
 }
 
 // *italic*, **bold**, ***bold italic***, _underline_, [[note]]
-function inline(text) {
+export function inline(text) {
   let out = escapeHtml(text)
   out = out.replace(/\[\[([^\]]+)\]\]/g, '<span class="fnote">$1</span>')
   out = out.replace(/\*\*\*([^*]+)\*\*\*/g, "<strong><em>$1</em></strong>")

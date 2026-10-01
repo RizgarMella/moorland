@@ -260,7 +260,16 @@ ships, and what is still open.
   cue autocomplete, the preview renders Markdown, the navigator lists `#`
   and `##` headings as chapters and scenes, and the mirror is written as
   `.md`. *Open:* one document per book or one per chapter; which manuscript
-  standard the PDF follows. Research (Sep 2026) into what prose needs that
+  standard the PDF follows. *First step shipped (Oct 1 2026):* `kind` on
+  Script, chosen on the dashboard (Screenplay / Story or book) and carried
+  to peers' mirrors; prose skips smart formatting, cue autocomplete, Tidy,
+  the Breakdown panel and screenplay exports; `prose.js` renders Markdown
+  (chapters, scenes, breaks, quotes, emphasis) with `data-line` on every
+  block so comments, tags and revision marks still work; the navigator
+  lists `#`/`##` headings; Reports shows manuscript pages (≈250 words),
+  reading time and chapters (`Stats.compute_prose/1`); print is standard
+  manuscript (12pt Times, double-spaced, chapters on new pages); the
+  mirror is `.md`. Left: DOCX/EPUB export, style checks, front matter. Research (Sep 2026) into what prose needs that
   the screenplay editor lacks, with the cost of each:
 
   | Feature | Cost |
