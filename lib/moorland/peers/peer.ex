@@ -10,6 +10,8 @@ defmodule Moorland.Peers.Peer do
     field :last_seen_at, :utc_datetime
     field :last_error, :string
     field :assistant, :boolean, default: false
+    # Learned from the peer's own replies: it relays scripts for its members.
+    field :studio, :boolean, default: false
 
     belongs_to :added_by, Moorland.Accounts.User, foreign_key: :added_by_user_id
 

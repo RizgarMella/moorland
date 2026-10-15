@@ -48,6 +48,19 @@ defmodule Moorland.Peers do
 
   def short_id, do: Crypto.fingerprint(identity().public_key)
 
+  ## Studio mode
+
+  @doc "Is this installation a studio, relaying scripts for its members?"
+  def studio?, do: identity().studio
+
+  @doc "Turns studio mode on or off for this installation."
+  def set_studio(on?) when is_boolean(on?) do
+    identity() |> Ecto.Changeset.change(studio: on?) |> Repo.update()
+  end
+
+  @doc "Studios among this user's peers: the ones a share can be routed through."
+  def list_studios(%Scope{} = scope), do: scope |> list_peers() |> Enum.filter(& &1.studio)
+
   ## Peers
 
   def list_peers do
@@ -141,9 +154,9 @@ defmodule Moorland.Peers do
     end
   end
 
-  def mark_seen(%Peer{} = peer) do
+  def mark_seen(%Peer{} = peer, attrs \\ []) do
     peer
-    |> Ecto.Changeset.change(last_seen_at: DateTime.utc_now(:second), last_error: nil)
+    |> Ecto.Changeset.change([last_seen_at: DateTime.utc_now(:second), last_error: nil] ++ attrs)
     |> Repo.update()
   end
 

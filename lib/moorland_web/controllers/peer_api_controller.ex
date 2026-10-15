@@ -34,7 +34,7 @@ defmodule MoorlandWeb.PeerApiController do
   # Inner requests carry their own status so errors stay encrypted too.
 
   defp handle("shared", _args, peer) do
-    {200, %{scripts: Scripts.peer_list_shared(peer.public_key)}}
+    {200, %{scripts: Scripts.peer_list_shared(peer.public_key), studio: Peers.studio?()}}
   end
 
   defp handle("fetch", %{"id" => id}, peer) when is_integer(id) do

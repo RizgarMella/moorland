@@ -211,13 +211,23 @@ defmodule Moorland.Scripts do
   end
 
   # Push instead of poll: after a change, tell the other side to sync now.
+  # A mirror pushes to its origin right away, and a studio's mirror also
+  # tells the members it relays to.
   @doc false
-  def nudge_peers(%Script{origin_public_key: nil} = script) do
+  def nudge_peers(%Script{} = script) do
+    if script.origin_public_key, do: Moorland.Peers.Sync.sync_now()
+    notify_downstream(script)
+  end
+
+  # The peers that read this script from us: direct shares, and for a share
+  # routed through a studio, the studio rather than the member.
+  defp notify_downstream(%Script{} = script) do
     peers =
       from(sh in PeerShare,
         join: p in Peer,
-        on: p.id == sh.peer_id,
+        on: p.id == coalesce(sh.studio_peer_id, sh.peer_id),
         where: sh.script_id == ^script.id,
+        distinct: true,
         select: p
       )
       |> Repo.all()
@@ -226,12 +236,6 @@ defmodule Moorland.Scripts do
       Task.start(fn -> Enum.each(peers, &Moorland.Peers.Client.notify/1) end)
     end
 
-    :ok
-  end
-
-  # A local change to a mirror: push it to the origin right away.
-  def nudge_peers(%Script{}) do
-    Moorland.Peers.Sync.sync_now()
     :ok
   end
 
@@ -1552,10 +1556,27 @@ defmodule Moorland.Scripts do
     |> Map.new()
   end
 
-  @doc "Sets, changes, or removes (role: nil/\"\") a peer share. Owner only."
-  def set_peer_share(%Scope{} = scope, %Script{} = script, peer_id, role) do
-    with :ok <- authorize(scope, script, :manage) do
+  @doc "Map of peer_id => studio peer_id for shares delivered through a studio."
+  def list_peer_routes(%Script{} = script) do
+    from(sh in PeerShare,
+      where: sh.script_id == ^script.id and not is_nil(sh.studio_peer_id),
+      select: {sh.peer_id, sh.studio_peer_id}
+    )
+    |> Repo.all()
+    |> Map.new()
+  end
+
+  @doc """
+  Sets, changes, or removes (role: nil/\"\") a peer share. Owner only.
+  `studio_peer_id` routes the share through one of the owner's studio
+  peers: the studio keeps a copy and passes it on, so the peer can sync
+  while this machine is off. nil delivers it directly.
+  """
+  def set_peer_share(%Scope{} = scope, %Script{} = script, peer_id, role, studio_peer_id \\ nil) do
+    with :ok <- authorize(scope, script, :manage),
+         {:ok, studio_peer_id} <- check_studio(scope, peer_id, studio_peer_id) do
       existing = Repo.get_by(PeerShare, script_id: script.id, peer_id: peer_id)
+      attrs = %{role: role, studio_peer_id: studio_peer_id}
 
       case {existing, role} do
         {nil, r} when r in [nil, ""] ->
@@ -1565,52 +1586,128 @@ defmodule Moorland.Scripts do
           Repo.delete(share)
           :ok
 
-        {nil, role} ->
+        {nil, _role} ->
           %PeerShare{}
-          |> PeerShare.changeset(%{script_id: script.id, peer_id: peer_id, role: role})
+          |> PeerShare.changeset(Map.merge(attrs, %{script_id: script.id, peer_id: peer_id}))
           |> Repo.insert()
           |> normalize_share_result()
 
-        {share, role} ->
+        {share, _role} ->
           share
-          |> PeerShare.changeset(%{role: role})
+          |> PeerShare.changeset(attrs)
           |> Repo.update()
           |> normalize_share_result()
       end
     end
   end
 
+  # A route must go through a studio this user trusts, and not to itself.
+  defp check_studio(_scope, _peer_id, studio_id) when studio_id in [nil, ""], do: {:ok, nil}
+
+  defp check_studio(scope, peer_id, studio_id) do
+    with {id, ""} <- Integer.parse(to_string(studio_id)),
+         true <- id != peer_id,
+         true <- Enum.any?(Moorland.Peers.list_studios(scope), &(&1.id == id)) do
+      {:ok, id}
+    else
+      _ -> {:error, :not_a_studio}
+    end
+  end
+
   defp normalize_share_result({:ok, _}), do: :ok
   defp normalize_share_result(error), do: error
 
+  # The share a peer acts under. A share routed through a studio is not
+  # served to its member directly (they get the studio's copy); the studio
+  # itself acts under the strongest role among the members it carries.
   defp peer_share_for(public_key, script_id) do
-    from(sh in PeerShare,
-      join: p in Peer,
-      on: sh.peer_id == p.id,
-      where: p.public_key == ^public_key and sh.script_id == ^script_id
-    )
-    |> Repo.one()
+    direct =
+      from(sh in PeerShare,
+        join: p in Peer,
+        on: sh.peer_id == p.id,
+        where:
+          p.public_key == ^public_key and sh.script_id == ^script_id and
+            is_nil(sh.studio_peer_id)
+      )
+      |> Repo.one()
+
+    relayed = Map.get(relayed_shares(public_key, script_id), script_id)
+    strongest_share(direct, relayed && relayed.role)
   end
 
   @doc "Scripts this installation shares with the requesting peer."
   def peer_list_shared(public_key) do
-    from(sh in PeerShare,
-      join: p in Peer,
-      on: sh.peer_id == p.id,
-      join: s in Script,
-      on: s.id == sh.script_id,
-      where: p.public_key == ^public_key,
-      select: %{
+    direct =
+      from(sh in PeerShare,
+        join: p in Peer,
+        on: sh.peer_id == p.id,
+        where: p.public_key == ^public_key and is_nil(sh.studio_peer_id),
+        select: {sh.script_id, sh.role}
+      )
+      |> Repo.all()
+      |> Map.new()
+
+    relayed = relayed_shares(public_key, nil)
+    ids = Enum.uniq(Map.keys(direct) ++ Map.keys(relayed))
+
+    from(s in Script, where: s.id in ^ids, order_by: s.id)
+    |> Repo.all()
+    |> Enum.map(fn s ->
+      relay = relayed[s.id]
+
+      %{
         id: s.id,
         title: s.title,
         content_version: s.content_version,
         updated_at: s.updated_at,
-        role: sh.role
+        role: strongest_role(direct[s.id], relay && relay.role),
+        activity: Activity.stamp(s.id)
       }
-    )
-    |> Repo.all()
-    |> Enum.map(&Map.put(&1, :activity, Activity.stamp(&1.id)))
+      |> then(&if(relay, do: Map.put(&1, :relay, relay.members), else: &1))
+    end)
   end
+
+  # Shares routed through the studio with this key, grouped per script:
+  # %{script_id => %{role: strongest, members: [%{key, role}]}}.
+  defp relayed_shares(studio_key, script_id) do
+    query =
+      from(sh in PeerShare,
+        join: st in Peer,
+        on: st.id == sh.studio_peer_id,
+        join: m in Peer,
+        on: m.id == sh.peer_id,
+        where: st.public_key == ^studio_key,
+        select: {sh.script_id, sh.role, m.public_key}
+      )
+
+    query = if script_id, do: where(query, [sh], sh.script_id == ^script_id), else: query
+
+    query
+    |> Repo.all()
+    |> Enum.group_by(&elem(&1, 0), fn {_, role, key} -> {role, key} end)
+    |> Map.new(fn {id, members} ->
+      {id,
+       %{
+         role: members |> Enum.map(&elem(&1, 0)) |> Enum.reduce(nil, &strongest_role/2),
+         members:
+           for(
+             {role, key} <- members,
+             do: %{key: Moorland.Peers.Crypto.encode_key(key), role: role}
+           )
+       }}
+    end)
+  end
+
+  @role_rank %{"viewer" => 1, "commenter" => 2, "editor" => 3}
+
+  defp strongest_role(nil, b), do: b
+  defp strongest_role(a, nil), do: a
+  defp strongest_role(a, b), do: if(@role_rank[a] >= @role_rank[b], do: a, else: b)
+
+  defp strongest_share(nil, nil), do: nil
+  defp strongest_share(nil, role), do: %PeerShare{role: role}
+  defp strongest_share(share, nil), do: share
+  defp strongest_share(share, role), do: %{share | role: strongest_role(share.role, role)}
 
   def peer_fetch(public_key, script_id) do
     case peer_share_for(public_key, script_id) do
@@ -1646,6 +1743,7 @@ defmodule Moorland.Scripts do
             {:content_saved, saved.id, nil, saved.content, saved.content_version}
           )
 
+          nudge_peers(saved)
           {:ok, %{content: saved.content, content_version: saved.content_version}}
         end
 
@@ -1772,6 +1870,77 @@ defmodule Moorland.Scripts do
     |> tap_mirror()
   end
 
+  @doc """
+  Studio side: shares this mirror with exactly the members its origin
+  routed through us (`[%{"key" => base64 key, "role" => role}]`). Only
+  members this studio already knows are reached; a studio never trusts a
+  stranger on the origin's word. With studio mode off it relays nothing.
+  """
+  def sync_relay(%Script{origin_public_key: origin_key} = mirror, members)
+      when is_binary(origin_key) do
+    wanted =
+      if Moorland.Peers.studio?() and is_list(members) do
+        for %{"key" => key64, "role" => role} <- members,
+            role in PeerShare.roles(),
+            {:ok, key} <- [Moorland.Peers.Crypto.decode_key(key64)],
+            key != origin_key,
+            %Peer{id: id} <- [Moorland.Peers.get_by_public_key(key)],
+            into: %{},
+            do: {id, role}
+      else
+        %{}
+      end
+
+    current = Repo.all(from(sh in PeerShare, where: sh.script_id == ^mirror.id))
+
+    for %PeerShare{peer_id: id} = share <- current,
+        not Map.has_key?(wanted, id),
+        do: Repo.delete!(share)
+
+    have = Map.new(current, &{&1.peer_id, &1})
+
+    for {id, role} <- wanted do
+      case have[id] do
+        %PeerShare{role: ^role} ->
+          :ok
+
+        %PeerShare{} = share ->
+          share |> PeerShare.changeset(%{role: role}) |> Repo.update!()
+
+        nil ->
+          %PeerShare{}
+          |> PeerShare.changeset(%{script_id: mirror.id, peer_id: id, role: role})
+          |> Repo.insert!()
+      end
+    end
+
+    :ok
+  end
+
+  @doc "How many mirrors this studio passes on to at least one member."
+  def count_relayed do
+    from(sh in PeerShare,
+      join: s in Script,
+      on: s.id == sh.script_id,
+      where: not is_nil(s.origin_public_key),
+      select: count(sh.script_id, :distinct)
+    )
+    |> Repo.one()
+  end
+
+  @doc """
+  Studio side: the origin answered and no longer lists these mirrors, so
+  nothing is routed through us for them any more. (An origin that doesn't
+  answer changes nothing: standing in while it's away is the point.)
+  """
+  def drop_unlisted_relays(public_key, listed_ids) do
+    from(s in Script,
+      where: s.origin_public_key == ^public_key and s.origin_script_id not in ^listed_ids
+    )
+    |> Repo.all()
+    |> Enum.each(&sync_relay(&1, []))
+  end
+
   @doc "Applies content agreed with the origin (a pull, or a push's merge result)."
   def apply_origin_content(%Script{} = mirror, title, content, version, role \\ nil) do
     mirror
@@ -1788,6 +1957,10 @@ defmodule Moorland.Scripts do
         ContentCache.put(saved.id, saved.content_version, saved.content)
         Moorland.Storage.mirror_script(saved)
         broadcast(saved.id, {:content_saved, saved.id, nil, saved.content, saved.content_version})
+
+        if {saved.title, saved.content} != {mirror.title, mirror.content},
+          do: notify_downstream(saved)
+
         {:ok, saved}
 
       error ->

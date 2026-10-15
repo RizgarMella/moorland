@@ -47,9 +47,10 @@ defmodule Moorland.Peers.Sync do
 
   defp sync_peer(peer) do
     case Client.list_shared(peer) do
-      {:ok, %{"scripts" => scripts}} ->
-        Peers.mark_seen(peer)
+      {:ok, %{"scripts" => scripts} = reply} ->
+        Peers.mark_seen(peer, studio: reply["studio"] == true)
         Enum.each(scripts, &reconcile(peer, &1))
+        Scripts.drop_unlisted_relays(peer.public_key, Enum.map(scripts, & &1["id"]))
 
       {:error, reason} ->
         Peers.mark_error(peer, describe(reason))
@@ -77,6 +78,7 @@ defmodule Moorland.Peers.Sync do
     mirror = Scripts.get_mirror(peer.public_key, origin_id)
 
     with {:ok, mirror} <- reconcile_content(peer, mirror, remote_version, meta) do
+      Scripts.sync_relay(mirror, meta["relay"])
       reconcile_activity(peer, mirror, meta["activity"])
     end
   end

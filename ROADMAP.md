@@ -21,7 +21,7 @@ where each stands now:
 | 3 | Transport is signed but **not encrypted** — safe on LAN/VPN, not for the open internet | Phase 2 | Closed Sep 6 2026 |
 | 4 | Content-only sync: comments, notes, and version history stay on each machine | Phase 2 | Closed Sep 6 2026 |
 | 5 | Poll-based (~10 s) propagation between installs, not keystroke-live | Phase 2 | Closed Sep 1 2026 (push notify) |
-| 6 | The origin machine is the authority and must be online for its scripts to sync — no third copy holds them | Phase 2 (studio backup) | Open |
+| 6 | The origin machine is the authority and must be online for its scripts to sync — no third copy holds them | Phase 2 (studio backup) | Partly: studio relay of script text shipped Oct 15 2026; comments, notes and history still need the origin |
 | 7 | If a save's base version falls out of the origin's cache (~200 versions), that save degrades to last-write-wins | Phase 2 (persist merge bases) | Closed Aug 31 2026 |
 | 8 | Mirrors attach to whichever local user added the peer; peer trust is per-installation, not per-user | Phase 2 | Closed Sep 1 2026 |
 | 9 | Runs as a dev server started by hand; nothing claims a `.local` name or updates itself | Phase 4 | Closed Oct 1 2026: one-file builds (Sep 6), signed self-installing updates and the `.local` name (Oct 1) |
@@ -270,6 +270,22 @@ it wrote; the origin's owner can delete anything and the next pull follows.
 - **Studio mode** [peer, phase 2 core; fixes #6] — the settings toggle that
   makes any install a studio: backup of members' shared scripts, sharing
   management, member introduction/relay.
+  *Relay of script text (Oct 15 2026):* a toggle on the Peers page makes an
+  install a studio, and studios say so inside their encrypted share list.
+  In the Share panel an owner can send a peer's share "through" one of
+  their studios (`PeerShare.studio_peer_id`): the member is no longer
+  served directly; the studio mirrors the script under the strongest role
+  it carries and re-shares that mirror to exactly the routed members it
+  already knows (`Scripts.sync_relay/2`; a studio never trusts a stranger on
+  the origin's word). Members sync with the studio while the owner is
+  offline, their edits wait there, and the studio's ordinary push merges
+  them three-way at the origin when it returns; changes from the origin
+  are passed on down. The studio's copy is also the third copy. Verified
+  end to end with three running installs (owner offline, both sides edit,
+  merge on return). Left: relaying comments, notes, history, stripboard
+  and media (`Activity.pending/1` holds back items that came from a
+  downstream peer), restoring an owner's machine from the studio, and
+  sharing management and introductions.
 - **Single-exe packaging + hot-swap updates** [packaging, fixes #9] — Burrito
   builds one file per OS; it claims `moorland-<shortid>.local` on launch;
   the existing update banner gains true install-on-restart (signature-checked

@@ -83,6 +83,15 @@ defmodule MoorlandWeb.PeerApiControllerTest do
     assert {200, %{"ok" => true}} = call(conn, remote, "notify", %{})
   end
 
+  test "the share list says whether this installation is a studio", %{
+    conn: conn,
+    remote: remote
+  } do
+    assert {200, %{"studio" => false}} = call(conn, remote, "shared", %{})
+    {:ok, _} = Peers.set_studio(true)
+    assert {200, %{"studio" => true}} = call(conn, remote, "shared", %{})
+  end
+
   test "nothing about the script travels in the clear", %{
     conn: conn,
     script: script,

@@ -8,6 +8,8 @@ defmodule Moorland.Peers.Identity do
     field :private_key, :binary, redact: true
     field :host, :string, default: "127.0.0.1"
     field :port, :integer, default: 4000
+    # Studio mode: relay scripts members share through this installation.
+    field :studio, :boolean, default: false
 
     timestamps(type: :utc_datetime)
   end

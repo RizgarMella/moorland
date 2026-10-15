@@ -32,7 +32,8 @@ defmodule MoorlandWeb.PeerLive.Index do
       nearby: nearby_not_added(socket),
       data_dir: Moorland.Storage.data_dir(),
       mirror_dir: Moorland.Storage.mirror_dir(),
-      local_url: Moorland.Peers.Mdns.url()
+      local_url: Moorland.Peers.Mdns.url(),
+      relayed: Moorland.Scripts.count_relayed()
     )
   end
 
@@ -75,6 +76,19 @@ defmodule MoorlandWeb.PeerLive.Index do
       {:error, %Ecto.Changeset{}} ->
         {:noreply, put_flash(socket, :error, "That peer is already added.")}
     end
+  end
+
+  def handle_event("toggle_studio", _params, socket) do
+    on? = !socket.assigns.identity.studio
+    {:ok, _} = Peers.set_studio(on?)
+    Moorland.Peers.Sync.sync_now()
+
+    message =
+      if on?,
+        do: "Studio mode on. Scripts members route through you will start arriving.",
+        else: "Studio mode off. Relayed scripts stay here but are no longer passed on."
+
+    {:noreply, socket |> put_flash(:info, message) |> refresh()}
   end
 
   def handle_event("toggle_assistant", %{"id" => id} = params, socket) do
@@ -374,6 +388,43 @@ defmodule MoorlandWeb.PeerLive.Index do
           </div>
         </div>
 
+        <div id="studio-mode" class="mt-6 rounded-lg border border-base-300 p-5">
+          <div class="flex items-start gap-4">
+            <div class="min-w-0 flex-1">
+              <h2 class="flex items-center gap-2 text-sm font-semibold">
+                Studio mode
+                <span
+                  :if={@identity.studio}
+                  class="rounded-full bg-success/15 px-2 py-px text-[10px] font-semibold uppercase tracking-wide text-success"
+                >
+                  On
+                </span>
+              </h2>
+              <p class="mt-1 text-[11px] leading-relaxed text-base-content/50">
+                A studio keeps a copy of the scripts its members route through it and passes
+                them on, so a writing circle keeps working while the script's owner is offline.
+                Edits merge back when they return. Best on a machine that stays on.
+              </p>
+              <p :if={@identity.studio} id="studio-relaying" class="mt-2 text-xs text-base-content/70">
+                <%= if @relayed == 0 do %>
+                  Nothing relayed yet. Members choose this studio in a script's Share panel; you
+                  pass scripts on only to peers you have added here.
+                <% else %>
+                  Relaying {@relayed} {if @relayed == 1, do: "script", else: "scripts"}.
+                <% end %>
+              </p>
+            </div>
+            <input
+              id="studio-toggle"
+              type="checkbox"
+              class="toggle toggle-sm mt-0.5 shrink-0"
+              checked={@identity.studio}
+              phx-click="toggle_studio"
+              aria-label="Studio mode"
+            />
+          </div>
+        </div>
+
         <div class="mt-6">
           <div class="flex items-center justify-between">
             <h2 class="text-xs font-semibold uppercase tracking-wider text-base-content/50">
@@ -397,6 +448,13 @@ defmodule MoorlandWeb.PeerLive.Index do
                     class="rounded bg-primary/15 px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-primary"
                   >
                     AI
+                  </span>
+                  <span
+                    :if={peer.studio}
+                    class="rounded bg-base-200 px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-base-content/60"
+                    title="This installation is a studio: you can route shared scripts through it"
+                  >
+                    Studio
                   </span>
                 </div>
                 <div class="mt-0.5 text-[11px] text-base-content/50">

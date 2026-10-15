@@ -77,6 +77,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
       collaborators: Scripts.list_collaborators(script),
       peers: Moorland.Peers.list_peers(socket.assigns.current_scope),
       peer_shares: Scripts.list_peer_shares(script),
+      peer_routes: Scripts.list_peer_routes(script),
       bin: Scripts.list_bin(script),
       suggestions: Scripts.list_open_suggestions(script),
       shelf: Scripts.list_shelf(socket.assigns.current_scope)
@@ -713,9 +714,21 @@ defmodule MoorlandWeb.ScriptLive.Editor do
     {:noreply, load_panel_data(socket)}
   end
 
-  def handle_event("set_peer_share", %{"peer_id" => peer_id, "role" => role}, socket) do
+  def handle_event("set_peer_share", %{"peer_id" => peer_id, "role" => role} = params, socket) do
     %{current_scope: scope, script: script} = socket.assigns
-    Scripts.set_peer_share(scope, script, String.to_integer(peer_id), role)
+
+    socket =
+      case Scripts.set_peer_share(
+             scope,
+             script,
+             String.to_integer(peer_id),
+             role,
+             params["studio_peer_id"]
+           ) do
+        {:error, :not_a_studio} -> put_flash(socket, :error, "That peer isn't a studio.")
+        _ -> socket
+      end
+
     {:noreply, load_panel_data(socket)}
   end
 
@@ -1559,6 +1572,7 @@ defmodule MoorlandWeb.ScriptLive.Editor do
             role={@role}
             peers={@peers}
             peer_shares={@peer_shares}
+            peer_routes={@peer_routes}
           />
         </aside>
       </div>
@@ -2500,8 +2514,11 @@ defmodule MoorlandWeb.ScriptLive.Editor do
   attr :role, :atom, required: true
   attr :peers, :list, required: true
   attr :peer_shares, :map, required: true
+  attr :peer_routes, :map, required: true
 
   defp share_panel(assigns) do
+    assigns = assign(assigns, :studios, Enum.filter(assigns.peers, & &1.studio))
+
     ~H"""
     <div class="flex flex-col">
       <div class="border-b border-base-300 px-4 py-3">
@@ -2594,14 +2611,22 @@ defmodule MoorlandWeb.ScriptLive.Editor do
           Peer installations
         </h3>
         <p class="mt-0.5 text-[11px] text-base-content/50">
-          Shared peers mirror this script on their machine and sync directly with yours.
+          {if @studios == [],
+            do: "Shared peers mirror this script on their machine and sync directly with yours.",
+            else:
+              "Shared peers mirror this script on their machine and sync with yours directly, or through a studio that stands in while you're away."}
         </p>
         <div class="mt-2 space-y-2">
-          <div :for={peer <- @peers} class="flex items-center justify-between gap-2">
-            <span class="min-w-0 flex-1 truncate text-sm">{peer.name}</span>
-            <form id={"peer-share-#{peer.id}"} phx-change="set_peer_share" class="shrink-0">
-              <input type="hidden" name="peer_id" value={peer.id} />
-              <select name="role" class="select select-bordered select-xs">
+          <form
+            :for={peer <- @peers}
+            id={"peer-share-#{peer.id}"}
+            phx-change="set_peer_share"
+            class="space-y-1"
+          >
+            <input type="hidden" name="peer_id" value={peer.id} />
+            <div class="flex items-center justify-between gap-2">
+              <span class="min-w-0 flex-1 truncate text-sm">{peer.name}</span>
+              <select name="role" class="select select-bordered select-xs w-28 shrink-0">
                 <option value="" selected={!Map.has_key?(@peer_shares, peer.id)}>Not shared</option>
                 <option value="editor" selected={@peer_shares[peer.id] == "editor"}>Editor</option>
                 <option value="commenter" selected={@peer_shares[peer.id] == "commenter"}>
@@ -2609,8 +2634,30 @@ defmodule MoorlandWeb.ScriptLive.Editor do
                 </option>
                 <option value="viewer" selected={@peer_shares[peer.id] == "viewer"}>Viewer</option>
               </select>
-            </form>
-          </div>
+            </div>
+            <% studios = Enum.reject(@studios, &(&1.id == peer.id)) %>
+            <div
+              :if={Map.has_key?(@peer_shares, peer.id) and studios != []}
+              class="flex items-center justify-end gap-1.5 text-[11px] text-base-content/50"
+            >
+              <.icon name="hero-arrows-right-left" class="size-3" />
+              <select
+                name="studio_peer_id"
+                class="select select-ghost select-xs h-6 min-h-6 w-auto max-w-48 text-[11px]"
+                aria-label={"How #{peer.name} receives it"}
+                title="Through a studio, they can keep syncing while this machine is off"
+              >
+                <option value="" selected={is_nil(@peer_routes[peer.id])}>Directly</option>
+                <option
+                  :for={studio <- studios}
+                  value={studio.id}
+                  selected={@peer_routes[peer.id] == studio.id}
+                >
+                  Through {studio.name}
+                </option>
+              </select>
+            </div>
+          </form>
         </div>
       </div>
 
