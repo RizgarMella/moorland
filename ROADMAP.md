@@ -21,7 +21,7 @@ where each stands now:
 | 3 | Transport is signed but **not encrypted** — safe on LAN/VPN, not for the open internet | Phase 2 | Closed Sep 6 2026 |
 | 4 | Content-only sync: comments, notes, and version history stay on each machine | Phase 2 | Closed Sep 6 2026 |
 | 5 | Poll-based (~10 s) propagation between installs, not keystroke-live | Phase 2 | Closed Sep 1 2026 (push notify) |
-| 6 | The origin machine is the authority and must be online for its scripts to sync — no third copy holds them | Phase 2 (studio backup) | Partly: studio relay of script text shipped Oct 15 2026; comments, notes and history still need the origin |
+| 6 | The origin machine is the authority and must be online for its scripts to sync — no third copy holds them | Phase 2 (studio backup) | Closed Oct 15 2026 (studio relay of script text and activity); restore-from-studio still open |
 | 7 | If a save's base version falls out of the origin's cache (~200 versions), that save degrades to last-write-wins | Phase 2 (persist merge bases) | Closed Aug 31 2026 |
 | 8 | Mirrors attach to whichever local user added the peer; peer trust is per-installation, not per-user | Phase 2 | Closed Sep 1 2026 |
 | 9 | Runs as a dev server started by hand; nothing claims a `.local` name or updates itself | Phase 4 | Closed Oct 1 2026: one-file builds (Sep 6), signed self-installing updates and the `.local` name (Oct 1) |
@@ -282,10 +282,16 @@ it wrote; the origin's owner can delete anything and the next pull follows.
   them three-way at the origin when it returns; changes from the origin
   are passed on down. The studio's copy is also the third copy. Verified
   end to end with three running installs (owner offline, both sides edit,
-  merge on return). Left: relaying comments, notes, history, stripboard
-  and media (`Activity.pending/1` holds back items that came from a
-  downstream peer), restoring an owner's machine from the studio, and
-  sharing management and introductions.
+  merge on return). *Activity relay (Oct 15 2026):* what a member sends a
+  studio's mirror (comments and resolutions, notes, tags, shots and frames,
+  tasks, media, snapshots, revision sets, call-sheet confirmations,
+  deletions, the stripboard) is applied on a `:relay` side that keeps it
+  pending, so the studio's ordinary push carries it to the origin under the
+  member's name; a member's board waits at the studio rather than being
+  overwritten by the origin's. Verified end to end as above. Left:
+  suggested edits from assistant peers stay at the studio, restoring an
+  owner's machine from the studio's copy, and sharing management and
+  introductions.
 - **Single-exe packaging + hot-swap updates** [packaging, fixes #9] — Burrito
   builds one file per OS; it claims `moorland-<shortid>.local` on launch;
   the existing update banner gains true install-on-restart (signature-checked

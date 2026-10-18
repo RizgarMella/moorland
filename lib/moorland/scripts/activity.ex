@@ -198,12 +198,14 @@ defmodule Moorland.Scripts.Activity do
       when is_map(payload) do
     # What an assistant peer writes is marked as such, here and onwards.
     assistant? = peer.assistant == true
+    # On a studio's mirror, what members send is still to go up to the origin.
+    side = if script.origin_public_key, do: :relay, else: :origin
 
     comments? =
       Enum.reduce(list(payload, "comments"), false, fn item, acc ->
         case find(Comment, script.id, item["uid"]) do
           nil ->
-            case insert_comment(script, item, key, :origin, assistant?) do
+            case insert_comment(script, item, key, side, assistant?) do
               {:ok, comment} ->
                 Scripts.notify_comment(script, comment, nil)
                 true
@@ -213,15 +215,15 @@ defmodule Moorland.Scripts.Activity do
             end
 
           %Comment{} = existing ->
-            apply_resolution(existing, item, :origin) or acc
+            apply_resolution(existing, item, side) or acc
         end
       end)
 
     notes? =
       Enum.reduce(list(payload, "notes"), false, fn item, acc ->
         case find(Note, script.id, item["uid"]) do
-          nil -> insert_note(script, item, key, :origin, assistant?) == :ok or acc
-          %Note{peer_key: ^key} = existing -> apply_note_fields(existing, item, :origin) or acc
+          nil -> insert_note(script, item, key, side, assistant?) == :ok or acc
+          %Note{peer_key: ^key} = existing -> apply_note_fields(existing, item, side) or acc
           %Note{} -> acc
         end
       end)
@@ -230,10 +232,10 @@ defmodule Moorland.Scripts.Activity do
       Enum.reduce(list(payload, "tags"), false, fn item, acc ->
         case find(BreakdownTag, script.id, item["uid"]) do
           nil ->
-            insert_tag(script, item, key, :origin) == :ok or acc
+            insert_tag(script, item, key, side) == :ok or acc
 
           %BreakdownTag{peer_key: ^key} = existing ->
-            apply_tag_fields(existing, item, :origin) or acc
+            apply_tag_fields(existing, item, side) or acc
 
           %BreakdownTag{} ->
             acc
@@ -244,10 +246,10 @@ defmodule Moorland.Scripts.Activity do
       Enum.reduce(list(payload, "shots"), false, fn item, acc ->
         case find(Shot, script.id, item["uid"]) do
           nil ->
-            insert_shot(script, item, key, :origin) == :ok or acc
+            insert_shot(script, item, key, side) == :ok or acc
 
           %Shot{peer_key: ^key} = existing ->
-            apply_shot_fields(script, existing, item, :origin) or acc
+            apply_shot_fields(script, existing, item, side) or acc
 
           %Shot{} ->
             acc
@@ -258,10 +260,10 @@ defmodule Moorland.Scripts.Activity do
       Enum.reduce(list(payload, "media"), false, fn item, acc ->
         case find(MediaItem, script.id, item["uid"]) do
           nil ->
-            insert_media(script, item, key, :origin) == :ok or acc
+            insert_media(script, item, key, side) == :ok or acc
 
           %MediaItem{peer_key: ^key} = existing ->
-            apply_media_fields(existing, item, :origin) or acc
+            apply_media_fields(existing, item, side) or acc
 
           %MediaItem{} ->
             acc
@@ -272,13 +274,13 @@ defmodule Moorland.Scripts.Activity do
       Enum.reduce(list(payload, "tasks"), false, fn item, acc ->
         case find(ProductionTask, script.id, item["uid"]) do
           nil ->
-            insert_task(script, item, key, :origin) == :ok or acc
+            insert_task(script, item, key, side) == :ok or acc
 
           %ProductionTask{peer_key: ^key} = existing ->
-            apply_task_fields(existing, item, :origin, :all) or acc
+            apply_task_fields(existing, item, side, :all) or acc
 
           %ProductionTask{} = existing ->
-            apply_task_fields(existing, item, :origin, :status) or acc
+            apply_task_fields(existing, item, side, :status) or acc
         end
       end)
 
@@ -326,6 +328,7 @@ defmodule Moorland.Scripts.Activity do
               %MediaItem{peer_key: ^key} = record ->
                 drop_library_file(script.id, record.file)
                 Repo.delete(record)
+                remember_deletion(script, "media", record)
                 MapSet.put(deleted, MediaItem)
 
               _ ->
@@ -340,10 +343,17 @@ defmodule Moorland.Scripts.Activity do
 
               set ->
                 Repo.delete(set)
+
+                remember_deletion(script, "revision_set", %{
+                  uid: set.uid,
+                  synced_rev: if(set.synced_at || set.peer_key, do: 1, else: 0)
+                })
+
                 MapSet.put(deleted, RevisionSet)
             end
 
-          schema && delete_own(schema, script.id, item["uid"], key) ->
+          record = schema && delete_own(schema, script.id, item["uid"], key) ->
+            remember_deletion(script, item["kind"], record)
             MapSet.put(deleted, schema)
 
           true ->
@@ -378,7 +388,14 @@ defmodule Moorland.Scripts.Activity do
     changed =
       case payload["schedule"] do
         items when is_list(items) ->
-          announce_schedule(script, replace_schedule(script, items)) or changed
+          replaced? = replace_schedule(script, items)
+
+          if replaced? and side == :relay,
+            do:
+              from(s in Script, where: s.id == ^script.id)
+              |> Repo.update_all(inc: [schedule_rev: 1])
+
+          announce_schedule(script, replaced?) or changed
 
         _ ->
           changed
@@ -411,6 +428,10 @@ defmodule Moorland.Scripts.Activity do
 
   @doc "What a mirror still has to push: a wire payload plus a receipt for `mark_synced/1`."
   def pending(%Script{} = mirror) do
+    # What came from the origin is in sync; anything else (this mirror's own
+    # work, or a studio's members') still has to go up.
+    origin_key = mirror.origin_public_key || <<>>
+
     comments =
       Repo.all(
         from(c in Comment,
@@ -433,7 +454,8 @@ defmodule Moorland.Scripts.Activity do
       Repo.all(
         from(v in Version,
           where:
-            v.script_id == ^mirror.id and is_nil(v.synced_at) and is_nil(v.peer_key) and
+            v.script_id == ^mirror.id and is_nil(v.synced_at) and
+              (is_nil(v.peer_key) or v.peer_key != ^origin_key) and
               v.kind in ^@pushed_version_kinds,
           order_by: [asc: v.id],
           preload: [:author]
@@ -487,7 +509,9 @@ defmodule Moorland.Scripts.Activity do
     revision_sets =
       Repo.all(
         from(r in RevisionSet,
-          where: r.script_id == ^mirror.id and is_nil(r.synced_at) and is_nil(r.peer_key),
+          where:
+            r.script_id == ^mirror.id and is_nil(r.synced_at) and
+              (is_nil(r.peer_key) or r.peer_key != ^origin_key),
           order_by: [asc: r.id],
           preload: [:author]
         )
@@ -496,7 +520,9 @@ defmodule Moorland.Scripts.Activity do
     confirmations =
       Repo.all(
         from(c in CallConfirmation,
-          where: c.script_id == ^mirror.id and is_nil(c.synced_at) and is_nil(c.peer_key)
+          where:
+            c.script_id == ^mirror.id and is_nil(c.synced_at) and
+              (is_nil(c.peer_key) or c.peer_key != ^origin_key)
         )
       )
 
@@ -859,10 +885,13 @@ defmodule Moorland.Scripts.Activity do
   ## Records
 
   # On a mirror, records that arrive from the origin are in sync by definition.
+  # On a studio's mirror, records relayed from a member are still to push.
   defp arrival_changes(:mirror), do: [rev: 1, synced_rev: 1]
+  defp arrival_changes(:relay), do: [rev: 1, synced_rev: 0]
   defp arrival_changes(:origin), do: []
 
   defp update_changes(%{rev: rev}, :mirror), do: [rev: rev + 1, synced_rev: rev + 1]
+  defp update_changes(%{rev: rev}, :relay), do: [rev: rev + 1]
   defp update_changes(_record, :origin), do: []
 
   defp insert_comment(script, item, peer_key, side, assistant?) do
@@ -1035,14 +1064,15 @@ defmodule Moorland.Scripts.Activity do
     end
   end
 
+  # The deleted record, or nil when it isn't the peer's to delete.
   defp delete_own(schema, script_id, uid, key) do
     case find(schema, script_id, uid) do
       %{peer_key: ^key} = record ->
         Repo.delete(record)
-        true
+        record
 
       _ ->
-        false
+        nil
     end
   end
 
